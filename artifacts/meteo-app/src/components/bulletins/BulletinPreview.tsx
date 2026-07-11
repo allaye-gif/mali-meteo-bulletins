@@ -1,6 +1,7 @@
 import React from 'react';
 import { Bulletin } from '@workspace/api-client-react';
 import { CONDITIONS, VIGILANCE_NIVEAUX } from '@/lib/constants';
+import { MiniVigilanceMap } from './MiniVigilanceMap';
 
 /* ══════════════════════════════════════════════════════════
    DESIGN TOKENS — from official MALI-METEO bulletin format
@@ -242,16 +243,16 @@ function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
   return (
     <div style={{
       display: 'grid',
-      gridTemplateColumns: '22% 20% 18% 18% 22%',
+      gridTemplateColumns: '30% 22% 18% 13% 17%',
       alignItems: 'center',
-      padding: '8px 12px',
+      padding: '6px 8px',
       background: zebra ? '#e8f1fb' : '#ffffff',
       borderBottom: '1px solid #cfd8dc',
-      minHeight: 62,
+      minHeight: 60,
       fontFamily: FONT,
     }}>
       {/* Ville */}
-      <div style={{ fontSize: 15, color: '#000' }}>{v.nom}</div>
+      <div style={{ fontSize: 12.5, color: '#000', fontWeight: 500, lineHeight: 1.2, wordBreak: 'break-word' }}>{v.nom}</div>
 
       {/* Weather icon */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -259,12 +260,12 @@ function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
       </div>
 
       {/* Tmax / Tmin */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-          <span style={{ fontSize: 22, fontWeight: 600, color: '#c00000' }}>{v.tmax !== null ? v.tmax : '–'}</span>
-          <span style={{ fontSize: 20, fontWeight: 600, color: '#1f4e9c' }}>{v.tmin !== null ? v.tmin : '–'}</span>
+          <span style={{ fontSize: 21, fontWeight: 600, color: '#c00000' }}>{v.tmax !== null ? v.tmax : '–'}</span>
+          <span style={{ fontSize: 19, fontWeight: 600, color: '#1f4e9c' }}>{v.tmin !== null ? v.tmin : '–'}</span>
         </div>
-        <span style={{ fontSize: 11, color: '#000' }}>°C</span>
+        <span style={{ fontSize: 10, color: '#000' }}>°C</span>
       </div>
 
       {/* Wind arrow */}
@@ -273,7 +274,7 @@ function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
       </div>
 
       {/* Direction + speed */}
-      <div style={{ fontSize: 13, color: '#000', lineHeight: 1.35, paddingLeft: 8 }}>
+      <div style={{ fontSize: 12.5, color: '#000', lineHeight: 1.35 }}>
         <div>{v.directionVent ?? '–'}</div>
         <div>{v.vitesseVent !== null ? `${v.vitesseVent}km/h` : '–'}</div>
       </div>
@@ -332,21 +333,20 @@ function JournauxBulletin({ data }: { data: Bulletin }) {
         {/* Left: Situation générale (italic) */}
         <SituationGenerale s={data.situationGenerale} italic />
 
-        {/* Right: Vigilance map */}
-        <div>
-          <h2 style={{ color: BLUE, fontSize: 20, fontWeight: 700, textAlign: 'center', margin: '0 0 10px 0', fontFamily: FONT }}>
+        {/* Right: Vigilance map (dynamic SVG) */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <h2 style={{ color: BLUE, fontSize: 20, fontWeight: 700, textAlign: 'center', margin: '0 0 8px 0', fontFamily: FONT }}>
             Vigilance sur le pays dans les prochaines 24h
           </h2>
-          <img
-            src={`${base}assets/mali-vigilance-map.png`}
-            alt="Carte de vigilance du Mali"
-            style={{ width: '100%', display: 'block' }}
-            onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+          <MiniVigilanceMap
+            vigilanceData={data.donneesVigilance ?? []}
+            width={300}
           />
-          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {/* Legend */}
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4, alignSelf: 'flex-start', width: '100%' }}>
             {VIGILANCE_NIVEAUX.slice().reverse().map((v) => (
-              <div key={v.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#000' }}>
-                <span style={{ display: 'inline-block', width: 12, height: 12, borderRadius: '50%', background: v.color, flexShrink: 0 }} />
+              <div key={v.value} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#000', fontFamily: FONT }}>
+                <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', background: v.color, flexShrink: 0, border: '1px solid rgba(0,0,0,0.15)' }} />
                 {v.label}
               </div>
             ))}
