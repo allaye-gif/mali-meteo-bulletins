@@ -339,7 +339,7 @@ function JournauxBulletin({ data }: { data: Bulletin }) {
             Vigilance sur le pays dans les prochaines 24h
           </h2>
           <MiniVigilanceMap
-            vigilanceData={data.donneesVigilance ?? []}
+            vigilanceData={data.vigilanceNiveaux ?? []}
             width={300}
           />
           {/* Legend */}
