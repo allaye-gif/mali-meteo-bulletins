@@ -1,0 +1,321 @@
+import { createFileRoute } from "@tanstack/react-router";
+import headerImg from "@/assets/header-full.jpg";
+import mapImg from "@/assets/vigilance-map.jpg";
+
+export const Route = createFileRoute("/journalier")({
+  head: () => ({
+    meta: [
+      { title: "Bulletin météorologique du 08 juillet 2026 — Mali-Météo" },
+      {
+        name: "description",
+        content:
+          "Bulletin météorologique journalier du 08 juillet 2026 — Agence Nationale de la Météorologie du Mali (Mali-Météo).",
+      },
+    ],
+  }),
+  component: Journalier,
+});
+
+const FONT = '"Segoe UI", "Liberation Sans", Arial, Helvetica, sans-serif';
+
+type Cond = "pluie" | "nuageux" | "soleil";
+type City = {
+  ville: string;
+  cond: Cond;
+  tmax: number;
+  tmin: number;
+  dir: "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
+  speed: number;
+};
+
+// Wind "comes from" direction → arrow points to opposite direction
+// Rotation from North (arrow default up = 0deg pointing N)
+const dirRot: Record<City["dir"], number> = {
+  N: 180,
+  NE: 225,
+  E: 270,
+  SE: 315,
+  S: 0,
+  SO: 45,
+  O: 90,
+  NO: 135,
+};
+
+const leftCol: City[] = [
+  { ville: "Kayes", cond: "pluie", tmax: 36, tmin: 26, dir: "O", speed: 5 },
+  { ville: "Koulikoro", cond: "pluie", tmax: 33, tmin: 25, dir: "SO", speed: 5 },
+  { ville: "Sikasso", cond: "pluie", tmax: 31, tmin: 24, dir: "SO", speed: 5 },
+  { ville: "Ségou", cond: "pluie", tmax: 35, tmin: 25, dir: "SO", speed: 5 },
+  { ville: "Mopti", cond: "pluie", tmax: 36, tmin: 26, dir: "SO", speed: 5 },
+  { ville: "Tombouctou", cond: "nuageux", tmax: 40, tmin: 27, dir: "SO", speed: 20 },
+  { ville: "Gao", cond: "pluie", tmax: 42, tmin: 27, dir: "O", speed: 10 },
+  { ville: "Menaka", cond: "pluie", tmax: 41, tmin: 27, dir: "O", speed: 10 },
+  { ville: "Kidal", cond: "nuageux", tmax: 43, tmin: 30, dir: "O", speed: 20 },
+  { ville: "Taoudéni", cond: "soleil", tmax: 45, tmin: 34, dir: "NE", speed: 20 },
+];
+
+const rightCol: City[] = [
+  { ville: "Bougouni", cond: "pluie", tmax: 33, tmin: 23, dir: "SO", speed: 5 },
+  { ville: "Koutiala", cond: "pluie", tmax: 33, tmin: 25, dir: "SO", speed: 5 },
+  { ville: "Dioïla", cond: "pluie", tmax: 33, tmin: 24, dir: "SO", speed: 5 },
+  { ville: "Nioro", cond: "pluie", tmax: 35, tmin: 26, dir: "O", speed: 5 },
+  { ville: "Nara", cond: "pluie", tmax: 36, tmin: 26, dir: "O", speed: 5 },
+  { ville: "Kita", cond: "pluie", tmax: 33, tmin: 23, dir: "SO", speed: 5 },
+  { ville: "San", cond: "pluie", tmax: 34, tmin: 25, dir: "SO", speed: 5 },
+  { ville: "Douentza", cond: "pluie", tmax: 38, tmin: 25, dir: "O", speed: 5 },
+  { ville: "Bandiagara", cond: "pluie", tmax: 36, tmin: 25, dir: "SO", speed: 5 },
+];
+
+const bamako: City = { ville: "Bamako", cond: "pluie", tmax: 34, tmin: 24, dir: "SO", speed: 5 };
+
+function WeatherIcon({ cond }: { cond: Cond }) {
+  if (cond === "soleil") {
+    return (
+      <svg width="52" height="42" viewBox="0 0 64 52" aria-hidden>
+        <g>
+          <circle cx="32" cy="26" r="12" fill="#f5c518" stroke="#e0a800" strokeWidth="1.5" />
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+            <line
+              key={a}
+              x1="32"
+              y1="26"
+              x2="32"
+              y2="4"
+              stroke="#f5c518"
+              strokeWidth="3"
+              strokeLinecap="round"
+              transform={`rotate(${a} 32 26)`}
+            />
+          ))}
+          <circle cx="32" cy="26" r="10" fill="#ffd633" />
+        </g>
+      </svg>
+    );
+  }
+  if (cond === "nuageux") {
+    return (
+      <svg width="60" height="42" viewBox="0 0 70 52" aria-hidden>
+        <ellipse cx="28" cy="20" rx="12" ry="10" fill="#f5c518" />
+        <path
+          d="M14 40 Q10 28 22 26 Q26 16 38 20 Q52 18 54 30 Q64 32 60 42 Q56 48 46 46 L20 46 Q10 46 14 40 Z"
+          fill="#d0d0d0"
+          stroke="#7a7a7a"
+          strokeWidth="1.2"
+        />
+      </svg>
+    );
+  }
+  // pluie (partiellement nuageux avec pluie + éclair)
+  return (
+    <svg width="60" height="48" viewBox="0 0 70 58" aria-hidden>
+      <circle cx="22" cy="16" r="9" fill="#f5c518" />
+      <path
+        d="M10 38 Q6 26 18 24 Q22 14 34 18 Q48 16 50 28 Q60 30 56 40 Q52 46 42 44 L16 44 Q6 44 10 38 Z"
+        fill="#bcbcbc"
+        stroke="#666"
+        strokeWidth="1"
+      />
+      <path d="M22 46 L18 54" stroke="#4aa3ff" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M40 46 L36 54" stroke="#4aa3ff" strokeWidth="2.2" strokeLinecap="round" />
+      <path d="M31 44 L27 52 L31 52 L28 58" fill="none" stroke="#f5b400" strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WindArrow({ rot }: { rot: number }) {
+  return (
+    <div
+      className="relative inline-flex items-center justify-center"
+      style={{ width: 46, height: 46 }}
+    >
+      <div
+        className="absolute inset-0 rounded-full"
+        style={{ border: "1.5px solid #333" }}
+      />
+      <svg
+        width="34"
+        height="34"
+        viewBox="0 0 34 34"
+        style={{ transform: `rotate(${rot}deg)` }}
+      >
+        <polygon points="17,3 27,27 17,22 7,27" fill="#111" />
+      </svg>
+    </div>
+  );
+}
+
+function CityRow({ c, zebra }: { c: City; zebra: boolean }) {
+  return (
+    <div
+      className="grid items-center px-3 py-2"
+      style={{
+        gridTemplateColumns: "22% 20% 18% 18% 22%",
+        background: zebra ? "#e8f1fb" : "#ffffff",
+        borderBottom: "1px solid #cfd8dc",
+        minHeight: 62,
+      }}
+    >
+      <div className="text-[15px] text-black">{c.ville}</div>
+      <div className="flex justify-center">
+        <WeatherIcon cond={c.cond} />
+      </div>
+      <div className="flex items-baseline gap-1">
+        <div className="flex flex-col leading-none">
+          <span className="text-[22px] font-semibold" style={{ color: "#c00000" }}>
+            {c.tmax}
+          </span>
+          <span className="text-[20px] font-semibold" style={{ color: "#1f4e9c" }}>
+            {c.tmin}
+          </span>
+        </div>
+        <span className="text-[11px] text-black">°C</span>
+      </div>
+      <div className="flex justify-center">
+        <WindArrow rot={dirRot[c.dir]} />
+      </div>
+      <div className="text-[13px] text-black leading-tight pl-2">
+        <div>{c.dir}</div>
+        <div>{c.speed}km/h</div>
+      </div>
+    </div>
+  );
+}
+
+function CityColumn({ items }: { items: City[] }) {
+  return (
+    <div style={{ border: "1.5px solid #2e74b5" }}>
+      {items.map((c, i) => (
+        <CityRow key={c.ville} c={c} zebra={i % 2 === 0} />
+      ))}
+    </div>
+  );
+}
+
+function Journalier() {
+  return (
+    <div
+      className="min-h-screen bg-white flex justify-center py-6"
+      style={{ fontFamily: FONT }}
+    >
+      <div className="w-full max-w-[980px] bg-white shadow-lg" style={{ fontFamily: FONT }}>
+        <img src={headerImg} alt="Mali Météo" className="w-full block" />
+
+        <div
+          className="text-white px-6 py-2"
+          style={{ background: "#2e74b5", fontFamily: FONT }}
+        >
+          <span className="text-[16px]">Bulletin météorologique du 08 juillet 2026</span>
+        </div>
+
+        <div className="px-6 py-5" style={{ fontFamily: FONT }}>
+          {/* Two-column top: Situation générale + Vigilance map */}
+          <div className="grid grid-cols-2 gap-5">
+            <div>
+              <h2
+                className="text-[22px] font-bold mb-3"
+                style={{ color: "#2e74b5" }}
+              >
+                Situation générale
+              </h2>
+              <div
+                className="p-4 text-[13.5px] leading-[1.75] text-black text-justify italic"
+                style={{ border: "1.5px solid #2e74b5" }}
+              >
+                <p className="mb-2">Le temps sera marqué par :</p>
+                <p className="mb-2">
+                  • une <strong>visibilité assez bonne</strong> dans l'ensemble, sauf au Nord du
+                  pays où elle sera parfois <strong>affectée par la poussière en suspension</strong> ;
+                </p>
+                <p className="mb-2">
+                  • des <strong>orages isolés</strong>, accompagnés de pluies dans la journée
+                  dans toutes les régions et le District de Bamako, sauf{" "}
+                  <strong>Taoudéni, le nord de Tombouctou et Kidal</strong> ;
+                </p>
+                <p>
+                  • des <strong>températures sans grand changement</strong> par rapport à celles
+                  observées hier dans tout le pays.
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <h2
+                className="text-[20px] font-bold mb-3 text-center"
+                style={{ color: "#2e74b5" }}
+              >
+                Vigilance sur le pays dans les prochaines 24h
+              </h2>
+              <img src={mapImg} alt="Carte de vigilance du Mali" className="w-full block" />
+              <div className="mt-2 flex flex-col gap-1 text-[13px] text-black">
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#e60000" }} />
+                  Vigilance absolue
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#f0a020" }} />
+                  Soyez très vigilants
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#ffe600" }} />
+                  Soyez attentifs
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-block w-3 h-3 rounded-full" style={{ background: "#2fb84a" }} />
+                  Pas de vigilance
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Prévision pour les villes */}
+          <h2
+            className="text-[22px] font-bold mt-6 mb-3"
+            style={{ color: "#2e74b5" }}
+          >
+            Prévision pour les villes
+          </h2>
+
+          <div className="grid gap-4" style={{ gridTemplateColumns: "1fr 1fr 0.55fr" }}>
+            <CityColumn items={leftCol} />
+            <CityColumn items={rightCol} />
+            {/* Bamako column */}
+            <div style={{ border: "1.5px solid #2e74b5" }} className="p-4 flex flex-col items-center gap-3">
+              <div className="text-[15px] text-black self-start">{bamako.ville}</div>
+              <WeatherIcon cond={bamako.cond} />
+              <div className="flex items-baseline gap-1">
+                <div className="flex flex-col leading-none items-center">
+                  <span className="text-[22px] font-semibold" style={{ color: "#c00000" }}>
+                    {bamako.tmax}
+                  </span>
+                  <span className="text-[20px] font-semibold" style={{ color: "#1f4e9c" }}>
+                    {bamako.tmin}
+                  </span>
+                </div>
+                <span className="text-[11px] text-black">°C</span>
+              </div>
+              <WindArrow rot={dirRot[bamako.dir]} />
+              <div className="text-[13px] text-black text-center leading-tight">
+                <div>{bamako.dir}</div>
+                <div>{bamako.speed}km/h</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          className="text-white text-center px-6 py-3 text-[13px] leading-[1.7]"
+          style={{ background: "#2e74b5", fontFamily: FONT }}
+        >
+          <p>
+            <strong>Agence Nationale de la Météorologie</strong> (MALI-METEO) sise Zone
+            Aéroportuaire de Bamako-Sénou
+          </p>
+          <p>
+            BP : 237 | Tél. (223) 20 20 62 04 | Fax : (223) 20 20 21 10 |{" "}
+            <strong>malimeteo@malimeteo.ml</strong>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

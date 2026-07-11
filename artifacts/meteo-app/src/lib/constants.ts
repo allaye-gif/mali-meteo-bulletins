@@ -33,10 +33,10 @@ export const CONDITIONS = [
 export const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 
 export const VIGILANCE_NIVEAUX = [
-  { value: 'pas_vigilance',  label: 'Pas de vigilance',      color: '#22c55e', bg: '#dcfce7' },
-  { value: 'attentifs',      label: 'Soyez attentifs',       color: '#ca8a04', bg: '#fef9c3' },
-  { value: 'tres_vigilants', label: 'Très vigilants',        color: '#ea580c', bg: '#ffedd5' },
-  { value: 'absolue',        label: 'Vigilance absolue',     color: '#dc2626', bg: '#fee2e2' },
+  { value: 'pas_vigilance',  label: 'Pas de vigilance',      color: '#2fb84a', bg: '#dcfce7' },
+  { value: 'attentifs',      label: 'Soyez attentifs',       color: '#ffe600', bg: '#fef9c3' },
+  { value: 'tres_vigilants', label: 'Soyez très vigilants',  color: '#f0a020', bg: '#ffedd5' },
+  { value: 'absolue',        label: 'Vigilance absolue',     color: '#e60000', bg: '#fee2e2' },
 ];
 
 export const REGIONS_VIGILANCE = CITIES.map(c => c.name);
