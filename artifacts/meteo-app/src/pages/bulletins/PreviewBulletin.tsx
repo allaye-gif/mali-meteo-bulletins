@@ -3,6 +3,7 @@ import { useParams, useSearch } from 'wouter';
 import { useGetBulletin, getGetBulletinQueryKey } from '@workspace/api-client-react';
 import { BulletinPreview } from '@/components/bulletins/BulletinPreview';
 import { Skeleton } from '@/components/ui/skeleton';
+import { printBulletin } from '@/lib/print';
 
 export function PreviewBulletin() {
   const { id: idParam } = useParams<{ id: string }>();
@@ -14,16 +15,16 @@ export function PreviewBulletin() {
   const { data: bulletin, isLoading } = useGetBulletin(id, {
     query: {
       enabled: !!id,
-      queryKey: getGetBulletinQueryKey(id)
-    }
+      queryKey: getGetBulletinQueryKey(id),
+    },
   });
 
   useEffect(() => {
     if (bulletin && shouldPrint && !isLoading) {
-      // Small delay to let images load
+      // Small delay to let images load, then open clean print window
       setTimeout(() => {
-        window.print();
-      }, 500);
+        printBulletin();
+      }, 600);
     }
   }, [bulletin, isLoading, shouldPrint]);
 
@@ -36,8 +37,8 @@ export function PreviewBulletin() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-200 print:bg-white flex justify-center p-8 print:p-0 overflow-auto">
-      <div className="w-[210mm] min-h-[297mm] bg-white shadow-2xl print:shadow-none shrink-0 print:m-0">
+    <div className="min-h-screen bg-slate-200 flex justify-center p-8 overflow-auto">
+      <div className="w-[210mm] min-h-[297mm] bg-white shadow-2xl shrink-0">
         <BulletinPreview data={bulletin} />
       </div>
     </div>

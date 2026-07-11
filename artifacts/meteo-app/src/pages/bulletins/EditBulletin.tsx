@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   ChevronLeft, Printer, RefreshCw, Loader2, Undo2, Redo2, Map, AlertTriangle, FileText,
 } from 'lucide-react';
+import { printBulletin } from '@/lib/print';
 import { BulletinPreview } from '@/components/bulletins/BulletinPreview';
 import {
   MaliInteractiveMap,
@@ -766,7 +767,7 @@ export function EditBulletin() {
             {weatherLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             Météo live
           </button>
-          <button onClick={() => window.open(`/bulletins/${id}/preview?print=true`, '_blank')}
+          <button onClick={() => printBulletin()}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-bold transition-all"
             style={{ background: '#c8a44a', color: '#0d1f3c' }}>
             <Printer size={13} /> Imprimer PDF

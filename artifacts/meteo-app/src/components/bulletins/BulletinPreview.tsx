@@ -449,7 +449,7 @@ export function BulletinPreview({ data }: Props) {
   const base = import.meta.env.BASE_URL;
 
   return (
-    <div style={{
+    <div id="bulletin-print-content" style={{
       background: 'white', color: '#000', fontFamily: FONT,
       width: '100%', minHeight: '297mm',
       display: 'flex', flexDirection: 'column',
