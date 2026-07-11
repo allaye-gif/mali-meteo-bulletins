@@ -46,6 +46,16 @@ export function printBulletin(): void {
     .city-row  { page-break-inside: avoid !important; break-inside: avoid !important; }
     .city-col   { page-break-inside: avoid !important; break-inside: avoid !important; }
     .bulletin-section { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+    /*
+     * KEY FIX: the root container has minHeight:'297mm' (full A4 height),
+     * but the printable area is only 297mm − 6mm top − 6mm bottom = 285mm.
+     * Without this override the footer always overflows onto a blank page 2.
+     */
+    #bulletin-print-content {
+      min-height: 285mm !important;
+      box-shadow: none !important;
+    }
   `;
 
   const win = window.open('', '_blank', 'width=900,height=1100,scrollbars=yes,menubar=yes,toolbar=yes');
