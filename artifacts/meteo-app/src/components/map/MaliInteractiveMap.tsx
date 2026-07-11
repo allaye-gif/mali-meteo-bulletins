@@ -157,42 +157,44 @@ function MapContent(props: Props) {
       const condIcon = condEntry?.icon ?? '';
       const isSelected = selectedEntity?.type === 'city' && selectedEntity.name === city.name;
       const bg = isSelected ? '#1d4ed8' : getTempColor(tmax);
-      const border = isSelected ? '#1e3a8a' : 'rgba(255,255,255,0.9)';
-      const scale = isSelected ? 'transform:scale(1.28);box-shadow:0 0 0 3px rgba(29,78,216,0.45),0 2px 8px rgba(0,0,0,0.35);' : '';
+      const border = isSelected ? '#1e3a8a' : 'rgba(255,255,255,0.85)';
+      const scale = isSelected
+        ? 'transform:scale(1.22);box-shadow:0 0 0 2px rgba(29,78,216,0.5),0 2px 6px rgba(0,0,0,0.3);z-index:999!important;'
+        : 'box-shadow:0 1px 5px rgba(0,0,0,0.28);';
 
       let inner = '';
       if (editMode === 'condition') {
-        inner = `<span style="font-size:17px;line-height:1;">${condIcon || '❓'}</span>`;
+        inner = `<span style="font-size:14px;line-height:1;">${condIcon || '❓'}</span>`;
       } else if (editMode === 'vent') {
         const dir = v?.directionVent ?? '–';
         const spd = v?.vitesseVent ?? null;
         inner = `
-          <span style="color:white;font-weight:800;font-size:9.5px;line-height:1.1;">${dir}</span>
-          <span style="color:rgba(255,255,255,0.85);font-size:8px;">${spd !== null ? spd + 'km' : '–'}</span>`;
+          <span style="color:white;font-weight:800;font-size:8px;line-height:1.1;">${dir}</span>
+          <span style="color:rgba(255,255,255,0.8);font-size:7px;">${spd !== null ? spd : '–'}</span>`;
       } else {
-        inner = `
-          <span style="color:white;font-weight:800;font-size:11px;line-height:1.1;">${tmax !== null ? tmax + '°' : '?'}</span>
-          ${condIcon ? `<span style="font-size:9px;">${condIcon}</span>` : ''}
-          ${editMode === 'temperature' && tmin !== null ? `<span style="color:#bfdbfe;font-size:8px;line-height:1;">${tmin}°</span>` : ''}`;
+        inner = `<span style="color:white;font-weight:800;font-size:10px;line-height:1;">${tmax !== null ? tmax + '°' : '?'}</span>`;
+        if (editMode === 'temperature' && tmin !== null) {
+          inner += `<span style="color:#bfdbfe;font-size:7px;line-height:1;">${tmin}°</span>`;
+        }
       }
 
       const icon = L.divIcon({
         className: '',
-        iconSize: [42, 58],
-        iconAnchor: [21, 21],
+        iconSize: [26, 38],
+        iconAnchor: [13, 13],
         html: `
           <div style="display:flex;flex-direction:column;align-items:center;">
             <div style="
-              width:40px;height:40px;border-radius:50%;
-              background:${bg};border:2.5px solid ${border};
-              display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-              cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.35);transition:transform .15s;
+              width:26px;height:26px;border-radius:50%;
+              background:${bg};border:2px solid ${border};
+              display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;
+              cursor:pointer;transition:transform .12s;
               ${scale}
             ">${inner}</div>
             <div style="
-              background:rgba(255,255,255,0.95);color:#1f2937;
-              font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;
-              margin-top:2px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,0.2);
+              background:rgba(255,255,255,0.93);color:#1f2937;
+              font-size:7.5px;font-weight:700;padding:1px 3px;border-radius:2px;
+              margin-top:1px;white-space:nowrap;box-shadow:0 1px 2px rgba(0,0,0,0.18);
               ${isSelected ? 'background:#dbeafe;color:#1d4ed8;' : ''}
             ">${city.name}</div>
           </div>`,

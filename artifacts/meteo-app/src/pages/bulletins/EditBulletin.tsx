@@ -22,7 +22,7 @@ import {
   SelectedEntity, VilleData, VigilanceData, EditMode,
 } from '@/components/map/MaliInteractiveMap';
 import {
-  CITIES, CONDITIONS, VIGILANCE_NIVEAUX,
+  CITIES, CONDITIONS, VIGILANCE_NIVEAUX, VIGILANCE_TYPES,
   getInitialVilleData, getInitialVigilanceData,
 } from '@/lib/constants';
 import { fetchMaliWeather } from '@/lib/weather-api';
@@ -193,9 +193,13 @@ function ModeToolbar({ active, onChange, canUndo, canRedo, onUndo, onRedo }: {
 /* ══════════════════════════════════════════════
    MODE CONTEXT BAR (palette / hints per mode)
    ══════════════════════════════════════════════ */
-function ContextBar({ editMode, activeBrush, setActiveBrush, onApplyAll, bulletinType }: {
+function ContextBar({ editMode, activeBrush, setActiveBrush, onApplyAll, bulletinType,
+  brushType, setBrushType, brushNiveau, setBrushNiveau,
+}: {
   editMode: EditMode; activeBrush: string | null; setActiveBrush: (b: string | null) => void;
   onApplyAll: () => void; bulletinType: string;
+  brushType: string | null; setBrushType: (t: string | null) => void;
+  brushNiveau: string | null; setBrushNiveau: (n: string | null) => void;
 }) {
   if (editMode === 'condition') {
     return (
@@ -251,55 +255,95 @@ function ContextBar({ editMode, activeBrush, setActiveBrush, onApplyAll, bulleti
   }
 
   if (editMode === 'vigilance') {
+    const hasBrush = !!activeBrush;
     return (
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-        background: '#fffbeb', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', flexShrink: 0,
+        display: 'flex', flexDirection: 'column', gap: 0,
+        background: '#fffbeb', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
       }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#d97706', textTransform: 'uppercase', letterSpacing: 1 }}>
-          🚨 Pinceau vigilance
-        </span>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {VIGILANCE_NIVEAUX.slice().reverse().map((v) => {
-            const active = activeBrush === v.value;
+        {/* Row 1 — Phenomenon type */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', flexWrap: 'wrap', borderBottom: '1px solid #fde68a' }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 90 }}>
+            ① Phénomène
+          </span>
+          {VIGILANCE_TYPES.filter(t => t.value !== 'aucun').map((t) => {
+            const active = brushType === t.value;
             return (
               <button
-                key={v.value}
-                onClick={() => setActiveBrush(active ? null : v.value)}
-                title={v.label}
+                key={t.value}
+                onClick={() => setBrushType(active ? null : t.value)}
+                title={t.label}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 7, padding: '5px 12px',
-                  borderRadius: 9, border: `2px solid ${v.color}`,
-                  background: active ? v.color : v.bg,
-                  color: active ? 'white' : v.color,
-                  fontWeight: active ? 800 : 600, fontSize: 12, cursor: 'pointer',
-                  transform: active ? 'scale(1.08)' : 'scale(1)',
-                  boxShadow: active ? `0 2px 10px ${v.color}66` : 'none',
-                  transition: 'all .12s',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center',
+                  padding: '3px 7px', borderRadius: 7,
+                  border: `2px solid ${active ? '#b45309' : '#fde68a'}`,
+                  background: active ? '#fef3c7' : 'white',
+                  cursor: 'pointer', gap: 1, transition: 'all .12s',
+                  boxShadow: active ? '0 0 0 2px #b4530966' : 'none',
                 }}
               >
-                <span style={{ width: 10, height: 10, borderRadius: '50%', background: active ? 'white' : v.color, display: 'inline-block', flexShrink: 0 }} />
-                {v.label}
+                <span style={{ fontSize: 17 }}>{t.icon}</span>
+                <span style={{ fontSize: 8, fontWeight: active ? 800 : 500, color: active ? '#92400e' : '#6b7280', whiteSpace: 'nowrap' }}>
+                  {t.label}
+                </span>
               </button>
             );
           })}
         </div>
-        {activeBrush && (
-          <>
-            <div style={{ width: 1, height: 32, background: '#e2e8f0' }} />
-            <button
-              onClick={onApplyAll}
-              style={{
-                fontSize: 11, padding: '4px 12px', borderRadius: 7,
-                background: '#f59e0b', color: 'white', border: 'none',
-                cursor: 'pointer', fontWeight: 700,
-              }}
-            >Peindre toutes les régions</button>
-          </>
-        )}
-        {!activeBrush && (
-          <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>← Sélectionnez un niveau, puis cliquez ou glissez sur les régions</span>
-        )}
+
+        {/* Row 2 — Severity level */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 90 }}>
+            ② Niveau
+          </span>
+          {VIGILANCE_NIVEAUX.map((v) => {
+            const active = brushNiveau === v.value;
+            return (
+              <button
+                key={v.value}
+                onClick={() => setBrushNiveau(active ? null : v.value)}
+                title={v.label}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7, padding: '4px 11px',
+                  borderRadius: 8, border: `2px solid ${v.color}`,
+                  background: active ? v.color : v.bg,
+                  color: active ? 'white' : v.color,
+                  fontWeight: active ? 800 : 600, fontSize: 11, cursor: 'pointer',
+                  transform: active ? 'scale(1.06)' : 'scale(1)',
+                  boxShadow: active ? `0 2px 8px ${v.color}55` : 'none',
+                  transition: 'all .12s',
+                }}
+              >
+                <span style={{ width: 9, height: 9, borderRadius: '50%', background: active ? 'white' : v.color, display: 'inline-block', flexShrink: 0 }} />
+                {v.label}
+              </button>
+            );
+          })}
+          {hasBrush && (
+            <>
+              <div style={{ width: 1, height: 28, background: '#fde68a', marginLeft: 4 }} />
+              <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                {brushType ? `${VIGILANCE_TYPES.find(t => t.value === brushType)?.icon} ${VIGILANCE_TYPES.find(t => t.value === brushType)?.label}` : '⚠️ Choisissez ①'}
+                {' + '}
+                {brushNiveau ? VIGILANCE_NIVEAUX.find(n => n.value === brushNiveau)?.label : '⚠️ Choisissez ②'}
+                {' → cliquez ou glissez sur les régions'}
+              </div>
+              <button
+                onClick={onApplyAll}
+                style={{
+                  fontSize: 10, padding: '3px 10px', borderRadius: 6,
+                  background: '#f59e0b', color: 'white', border: 'none',
+                  cursor: 'pointer', fontWeight: 700, marginLeft: 'auto',
+                }}
+              >Peindre toutes les régions</button>
+            </>
+          )}
+          {!hasBrush && (
+            <span style={{ fontSize: 10, color: '#a16207', marginLeft: 4 }}>
+              ← Choisissez ① un phénomène et ② un niveau de gravité, puis peignez les régions
+            </span>
+          )}
+        </div>
       </div>
     );
   }
@@ -451,6 +495,9 @@ export function EditBulletin() {
   // Studio state
   const [editMode, setEditMode] = useState<EditMode>('temperature');
   const [activeBrush, setActiveBrush] = useState<string | null>(null);
+  // Vigilance brush: type + niveau encoded as "type|niveau"
+  const [brushType, setBrushType]   = useState<string | null>(null);
+  const [brushNiveau, setBrushNiveau] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<VilleData | null>(null);
 
   // Undo / redo history
@@ -618,13 +665,16 @@ export function EditBulletin() {
     updateVille(cityName, 'condition', activeBrush);
   }, [activeBrush, updateVille]);
 
-  /* Paint region vigilance (brush mode) */
+  /* Paint region vigilance (brush mode) — activeBrush encodes "type|niveau" */
   const paintRegion = useCallback((regionName: string) => {
     if (!activeBrush) return;
+    const [type, niveau] = activeBrush.includes('|')
+      ? activeBrush.split('|')
+      : ['aucun', activeBrush];
     setFormData((prev) => {
       if (!prev) return prev;
       const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) =>
-        v.region === regionName ? { ...v, niveau: activeBrush } : v
+        v.region === regionName ? { ...v, niveau, type } : v
       );
       const next = { ...prev, vigilanceNiveaux };
       triggerSaveRef.current(next);
@@ -632,7 +682,7 @@ export function EditBulletin() {
     });
   }, [activeBrush]);
 
-  /* Apply brush to ALL cities */
+  /* Apply brush to ALL */
   const applyBrushAll = useCallback(() => {
     if (!activeBrush || !formData) return;
     if (editMode === 'condition') {
@@ -646,9 +696,12 @@ export function EditBulletin() {
         return next;
       });
     } else if (editMode === 'vigilance') {
+      const [type, niveau] = activeBrush.includes('|')
+        ? activeBrush.split('|')
+        : ['aucun', activeBrush];
       setFormData((prev) => {
         if (!prev) return prev;
-        const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) => ({ ...v, niveau: activeBrush }));
+        const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) => ({ ...v, niveau, type }));
         const next = { ...prev, vigilanceNiveaux };
         pushHistory({ villes: prev.donneesVilles, vigilance: vigilanceNiveaux });
         triggerSaveRef.current(next);
@@ -702,10 +755,21 @@ export function EditBulletin() {
     update({ bulletinDate: dateStr, periodLabel: label });
   };
 
+  /* Sync brushType + brushNiveau → activeBrush for vigilance mode */
+  useEffect(() => {
+    if (editMode === 'vigilance' && brushType && brushNiveau) {
+      setActiveBrush(`${brushType}|${brushNiveau}`);
+    } else if (editMode === 'vigilance') {
+      setActiveBrush(null);
+    }
+  }, [editMode, brushType, brushNiveau]);
+
   /* Switch mode → clear brush and selection */
   const switchMode = (mode: EditMode) => {
     setEditMode(mode);
     setActiveBrush(null);
+    setBrushType(null);
+    setBrushNiveau(null);
     setSelectedEntity(null);
   };
 
@@ -822,6 +886,10 @@ export function EditBulletin() {
             setActiveBrush={setActiveBrush}
             onApplyAll={applyBrushAll}
             bulletinType={formData.type}
+            brushType={brushType}
+            setBrushType={setBrushType}
+            brushNiveau={brushNiveau}
+            setBrushNiveau={setBrushNiveau}
           />
 
           {/* Map area + city sidebar */}

@@ -22,21 +22,35 @@ export const CITIES = [
 ];
 
 export const CONDITIONS = [
-  { value: 'ensoleille',           label: 'Ensoleillé',        icon: '☀️' },
-  { value: 'partiellement_nuageux', label: 'Part. nuageux',    icon: '🌤️' },
-  { value: 'nuageux',              label: 'Nuageux',           icon: '☁️' },
-  { value: 'pluvieux',             label: 'Pluvieux',          icon: '🌧️' },
-  { value: 'orageux',              label: 'Orageux',           icon: '⛈️' },
-  { value: 'couvert',              label: 'Couvert',           icon: '🌫️' },
+  { value: 'ensoleille',            label: 'Ensoleillé',     icon: '☀️' },
+  { value: 'partiellement_nuageux', label: 'Part. nuageux',  icon: '🌤️' },
+  { value: 'nuageux',               label: 'Nuageux',        icon: '☁️' },
+  { value: 'pluvieux',              label: 'Pluvieux',       icon: '🌧️' },
+  { value: 'orageux',               label: 'Orageux',        icon: '⛈️' },
+  { value: 'couvert',               label: 'Couvert',        icon: '🌫️' },
 ];
 
 export const DIRECTIONS_VENT = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
 
+/* ── Vigilance severity levels ── */
 export const VIGILANCE_NIVEAUX = [
-  { value: 'pas_vigilance',  label: 'Pas de vigilance',      color: '#2fb84a', bg: '#dcfce7' },
-  { value: 'attentifs',      label: 'Soyez attentifs',       color: '#ffe600', bg: '#fef9c3' },
-  { value: 'tres_vigilants', label: 'Soyez très vigilants',  color: '#f0a020', bg: '#ffedd5' },
-  { value: 'absolue',        label: 'Vigilance absolue',     color: '#e60000', bg: '#fee2e2' },
+  { value: 'pas_vigilance',  label: 'Pas de vigilance',     color: '#2fb84a', bg: '#dcfce7' },
+  { value: 'attentifs',      label: 'Soyez attentifs',      color: '#ffe600', bg: '#fef9c3' },
+  { value: 'tres_vigilants', label: 'Soyez très vigilants', color: '#f0a020', bg: '#ffedd5' },
+  { value: 'absolue',        label: 'Vigilance absolue',    color: '#e60000', bg: '#fee2e2' },
+];
+
+/* ── Vigilance phenomenon types ── */
+export const VIGILANCE_TYPES = [
+  { value: 'aucun',       label: 'Aucun',          icon: '–'  },
+  { value: 'orages',      label: 'Orages',          icon: '⛈️' },
+  { value: 'canicule',    label: 'Canicule',        icon: '🔥' },
+  { value: 'vent_fort',   label: 'Vents forts',     icon: '💨' },
+  { value: 'poussiere',   label: 'Poussière/Brume', icon: '🌫️' },
+  { value: 'fraicheur',   label: 'Fraîcheur',       icon: '❄️' },
+  { value: 'pluies',      label: 'Pluies intenses', icon: '🌧️' },
+  { value: 'inondations', label: 'Inondations',     icon: '🌊' },
+  { value: 'secheresse',  label: 'Sécheresse',      icon: '🏜️' },
 ];
 
 export const REGIONS_VIGILANCE = CITIES.map(c => c.name);
@@ -53,7 +67,7 @@ export function getInitialVilleData() {
 }
 
 export function getInitialVigilanceData() {
-  return REGIONS_VIGILANCE.map(r => ({ region: r, niveau: 'pas_vigilance' }));
+  return REGIONS_VIGILANCE.map(r => ({ region: r, niveau: 'pas_vigilance', type: 'aucun' }));
 }
 
 export function getTempColor(tmax: number | null): string {
@@ -66,5 +80,9 @@ export function getTempColor(tmax: number | null): string {
 }
 
 export function getVigilanceColor(niveau: string): string {
-  return VIGILANCE_NIVEAUX.find(v => v.value === niveau)?.color || '#22c55e';
+  return VIGILANCE_NIVEAUX.find(v => v.value === niveau)?.color || '#2fb84a';
+}
+
+export function getVigilanceTypeIcon(type: string): string {
+  return VIGILANCE_TYPES.find(t => t.value === type)?.icon || '–';
 }

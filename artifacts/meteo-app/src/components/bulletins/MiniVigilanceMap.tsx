@@ -1,9 +1,6 @@
 import React, { useMemo } from 'react';
-import { VIGILANCE_NIVEAUX } from '@/lib/constants';
+import { VIGILANCE_NIVEAUX, VIGILANCE_TYPES } from '@/lib/constants';
 
-/* ─────────────────────────────────────────────────────────
-   Minimal GeoJSON types (no @types/geojson needed)
-   ───────────────────────────────────────────────────────── */
 type Position = [number, number];
 type Ring = Position[];
 interface GeoPolygon    { type: 'Polygon';      coordinates: Ring[]; }
@@ -11,10 +8,6 @@ interface GeoMultiPoly  { type: 'MultiPolygon'; coordinates: Ring[][]; }
 interface GeoFeature    { type: 'Feature'; geometry: GeoPolygon | GeoMultiPoly; properties: Record<string, string | number>; }
 interface GeoCollection { type: 'FeatureCollection'; features: GeoFeature[]; }
 
-/* ─────────────────────────────────────────────────────────
-   GeoJSON bounds  (mali-admin1.geojson)
-   lon: -12.2392 → 4.2447   lat: 10.1414 → 24.9995
-   ───────────────────────────────────────────────────────── */
 const LON_MIN = -12.2392;
 const LON_MAX =  4.2447;
 const LAT_MIN = 10.1414;
@@ -44,22 +37,49 @@ function featureToPath(feat: GeoFeature): string {
   return geom.coordinates.flatMap((poly) => poly.map(ringToPath)).join(' ');
 }
 
-/* ─────────────────────────────────────────────────────────
-   Props
-   ───────────────────────────────────────────────────────── */
+/** Rough centroid: average projected coords of largest ring */
+function featureCentroid(feat: GeoFeature): [number, number] {
+  const geom = feat.geometry;
+  let ring: Ring;
+  if (geom.type === 'Polygon') {
+    ring = geom.coordinates[0];
+  } else {
+    // pick largest polygon (most coords)
+    const biggest = geom.coordinates.reduce((a, b) => (a[0].length > b[0].length ? a : b));
+    ring = biggest[0];
+  }
+  let sx = 0, sy = 0;
+  for (const [lon, lat] of ring) {
+    const [x, y] = project(lon, lat);
+    sx += x; sy += y;
+  }
+  return [sx / ring.length, sy / ring.length];
+}
+
+interface VigilanceItem {
+  region: string;
+  niveau: string;
+  type?: string;
+}
+
 interface Props {
-  vigilanceData: { region: string; niveau: string }[];
+  vigilanceData: VigilanceItem[];
   width?: number;
 }
 
 const COLOR_MAP: Record<string, string> = Object.fromEntries(
   VIGILANCE_NIVEAUX.map((v) => [v.value, v.color])
 );
+const TYPE_ICON: Record<string, string> = Object.fromEntries(
+  VIGILANCE_TYPES.map((t) => [t.value, t.icon])
+);
 
 export function MiniVigilanceMap({ vigilanceData, width = 260 }: Props) {
   const byRegion = useMemo(() => {
-    const m: Record<string, string> = {};
-    vigilanceData.forEach(({ region, niveau }) => { m[region] = niveau; });
+    const m: Record<string, { niveau: string; type: string }> = {};
+    vigilanceData.forEach(({ region, niveau, type }) => {
+      m[region] = { niveau, type: type ?? 'aucun' };
+    });
     return m;
   }, [vigilanceData]);
 
@@ -86,6 +106,8 @@ export function MiniVigilanceMap({ vigilanceData, width = 260 }: Props) {
     );
   }
 
+  const scale = width / VW;
+
   return (
     <svg
       viewBox={`0 0 ${VW} ${VH}`}
@@ -93,19 +115,46 @@ export function MiniVigilanceMap({ vigilanceData, width = 260 }: Props) {
       style={{ display: 'block' }}
       aria-label="Carte de vigilance du Mali"
     >
+      {/* Regions */}
       {geojson.features.map((feat) => {
         const name = String(feat.properties.name ?? '');
-        const niveau = byRegion[name] ?? 'pas_vigilance';
-        const fill = COLOR_MAP[niveau] ?? '#2fb84a';
+        const info = byRegion[name] ?? { niveau: 'pas_vigilance', type: 'aucun' };
+        const fill = COLOR_MAP[info.niveau] ?? '#2fb84a';
         return (
           <path
             key={name}
             d={featureToPath(feat)}
             fill={fill}
+            fillOpacity={0.85}
             stroke="#ffffff"
             strokeWidth="1.2"
             strokeLinejoin="round"
           />
+        );
+      })}
+
+      {/* Type icons overlay */}
+      {geojson.features.map((feat) => {
+        const name = String(feat.properties.name ?? '');
+        const info = byRegion[name] ?? { niveau: 'pas_vigilance', type: 'aucun' };
+        if (!info.type || info.type === 'aucun' || info.niveau === 'pas_vigilance') return null;
+        const icon = TYPE_ICON[info.type] ?? '';
+        if (!icon || icon === '–') return null;
+        const [cx, cy] = featureCentroid(feat);
+        // font-size in viewBox units (later scaled by the SVG width)
+        const fs = 18;
+        return (
+          <text
+            key={`icon-${name}`}
+            x={cx}
+            y={cy}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={fs}
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {icon}
+          </text>
         );
       })}
     </svg>
