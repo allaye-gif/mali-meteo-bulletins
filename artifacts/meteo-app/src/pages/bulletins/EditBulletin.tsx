@@ -1,24 +1,23 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocation, useParams } from 'wouter';
 import {
   useGetBulletin,
   useUpdateBulletin,
   useListTemplates,
+  useListBulletins,
   getGetBulletinQueryKey,
   Bulletin,
 } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  ChevronLeft, Printer, CloudSun, ChevronDown, ChevronUp,
-  RefreshCw, Loader2, Undo2, Redo2,
+  ChevronLeft, Printer, RefreshCw, Loader2, Undo2, Redo2, Map, AlertTriangle, FileText,
 } from 'lucide-react';
 import { BulletinPreview } from '@/components/bulletins/BulletinPreview';
 import {
   MaliInteractiveMap,
-  TempPanel, WindPanel, VigilanceEditPanel,
+  TempPanel, WindPanel,
   SelectedEntity, VilleData, VigilanceData, EditMode,
 } from '@/components/map/MaliInteractiveMap';
 import {
@@ -29,6 +28,7 @@ import { fetchMaliWeather } from '@/lib/weather-api';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 /* ─── History snapshot ─── */
 interface Snapshot { villes: VilleData[]; vigilance: VigilanceData[]; }
@@ -43,7 +43,13 @@ const BULLETIN_TYPES = [
   { value: 'national', label: 'National', emoji: '🗺️' },
 ];
 
-/* ─── Template picker ─── */
+/* ─── Studio tabs ─── */
+type StudioTab = 'carte' | 'vigilance' | 'textes';
+type CarteMode = 'temperature' | 'condition' | 'vent';
+
+/* ══════════════════════════════════════════════
+   TEMPLATE SELECTOR
+   ══════════════════════════════════════════════ */
 function TemplateSelector({ categorie, onSelect }: { categorie: string; onSelect: (t: string) => void }) {
   const { data: templates } = useListTemplates({ categorie });
   if (!templates?.length) return null;
@@ -64,407 +70,309 @@ function TemplateSelector({ categorie, onSelect }: { categorie: string; onSelect
   );
 }
 
-/* ─── Situation Générale accordion ─── */
-function SituationGeneralePanel({ sg, onChange }: {
-  sg: Bulletin['situationGenerale'];
-  onChange: (field: string, value: string) => void;
+/* ══════════════════════════════════════════════
+   STUDIO TAB BAR
+   ══════════════════════════════════════════════ */
+function StudioTabBar({ active, onChange, canUndo, canRedo, onUndo, onRedo }: {
+  active: StudioTab; onChange: (t: StudioTab) => void;
+  canUndo: boolean; canRedo: boolean; onUndo: () => void; onRedo: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const fields = [
-    { key: 'ciel',         label: 'Ciel',        categorie: 'ciel'         },
-    { key: 'vents',        label: 'Vents',        categorie: 'vents'        },
-    { key: 'visibilite',   label: 'Visibilité',   categorie: 'visibilite'   },
-    { key: 'orages',       label: 'Orages',       categorie: 'orages'       },
-    { key: 'temperatures', label: 'Températures', categorie: 'temperatures' },
+  const tabs: { id: StudioTab; icon: React.ReactNode; label: string; color: string }[] = [
+    { id: 'carte',      icon: <Map size={13} />,           label: 'Carte météo',    color: '#2563eb' },
+    { id: 'vigilance',  icon: <AlertTriangle size={13} />, label: 'Vigilance',      color: '#d97706' },
+    { id: 'textes',     icon: <FileText size={13} />,      label: 'Situation générale', color: '#7c3aed' },
   ];
   return (
-    <div className="border-b bg-white flex-shrink-0">
-      <button
-        onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 transition-colors"
-        style={{ borderBottom: open ? '1px solid #e5e7eb' : 'none' }}
-      >
-        <span className="font-semibold text-sm flex items-center gap-2">
-          <CloudSun size={15} /> Situation Générale
-        </span>
-        {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-      </button>
-      {open && (
-        <div className="px-4 py-3 space-y-3 overflow-y-auto" style={{ maxHeight: 280 }}>
-          {fields.map((f) => (
-            <div key={f.key}>
-              <div className="flex items-center justify-between mb-0.5">
-                <label className="text-xs font-semibold text-gray-600 uppercase">{f.label}</label>
-                <TemplateSelector categorie={f.categorie} onSelect={(text) => onChange(f.key, text)} />
-              </div>
-              <Textarea rows={2} className="text-xs resize-none"
-                value={(sg as any)[f.key] || ''}
-                placeholder={`Description — ${f.label.toLowerCase()}`}
-                onChange={(e) => onChange(f.key, e.target.value)}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════
-   MODE TOOLBAR
-   ══════════════════════════════════════════════ */
-const MODE_CONFIG: { mode: EditMode; icon: string; label: string; color: string }[] = [
-  { mode: 'temperature', icon: '🌡️', label: 'Températures', color: '#dc2626' },
-  { mode: 'condition',   icon: '☁️',  label: 'Nébulosité',  color: '#8b5cf6' },
-  { mode: 'vent',        icon: '💨',  label: 'Vent',        color: '#0ea5e9' },
-  { mode: 'vigilance',   icon: '🚨',  label: 'Vigilance',   color: '#f59e0b' },
-];
-
-function ModeToolbar({ active, onChange, canUndo, canRedo, onUndo, onRedo }: {
-  active: EditMode; onChange: (m: EditMode) => void;
-  canUndo: boolean; canRedo: boolean;
-  onUndo: () => void; onRedo: () => void;
-}) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
-      background: '#f8fafc', borderBottom: '1px solid #e2e8f0',
-      flexShrink: 0, flexWrap: 'wrap',
-    }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginRight: 4 }}>
-        Mode
-      </span>
-      {MODE_CONFIG.map(({ mode, icon, label, color }) => {
-        const isActive = active === mode;
+    <div style={{ display: 'flex', alignItems: 'center', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0, paddingLeft: 8, paddingRight: 8 }}>
+      {tabs.map((tab) => {
+        const isActive = active === tab.id;
         return (
           <button
-            key={mode}
-            onClick={() => onChange(mode)}
-            title={label}
+            key={tab.id}
+            onClick={() => onChange(tab.id)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-              borderRadius: 8,
-              background: isActive ? color : 'white',
-              border: `2px solid ${isActive ? color : '#e2e8f0'}`,
-              color: isActive ? 'white' : '#374151',
-              fontWeight: isActive ? 700 : 500,
-              fontSize: 12, cursor: 'pointer',
-              transition: 'all .15s',
-              boxShadow: isActive ? `0 2px 8px ${color}55` : 'none',
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px',
+              border: 'none', borderBottom: isActive ? `2px solid ${tab.color}` : '2px solid transparent',
+              background: 'none', cursor: 'pointer',
+              color: isActive ? tab.color : '#64748b',
+              fontWeight: isActive ? 700 : 500, fontSize: 12,
+              transition: 'all .12s',
+              marginBottom: -1,
             }}
           >
-            <span style={{ fontSize: 14 }}>{icon}</span>
-            {label}
+            {tab.icon} {tab.label}
           </button>
         );
       })}
       <div style={{ flex: 1 }} />
-      {/* Undo / Redo */}
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button
-          onClick={onUndo} disabled={!canUndo} title="Annuler (Ctrl+Z)"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-            borderRadius: 7, border: '1.5px solid #e2e8f0',
-            background: canUndo ? 'white' : '#f9fafb',
-            color: canUndo ? '#374151' : '#d1d5db',
-            fontSize: 12, cursor: canUndo ? 'pointer' : 'default',
-          }}
-        >
-          <Undo2 size={13} /> Annuler
-        </button>
-        <button
-          onClick={onRedo} disabled={!canRedo} title="Rétablir (Ctrl+Y)"
-          style={{
-            display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
-            borderRadius: 7, border: '1.5px solid #e2e8f0',
-            background: canRedo ? 'white' : '#f9fafb',
-            color: canRedo ? '#374151' : '#d1d5db',
-            fontSize: 12, cursor: canRedo ? 'pointer' : 'default',
-          }}
-        >
-          <Redo2 size={13} /> Rétablir
-        </button>
-      </div>
+      <button onClick={onUndo} disabled={!canUndo} title="Annuler (Ctrl+Z)"
+        style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: canUndo ? 'white' : '#f9fafb', color: canUndo ? '#374151' : '#d1d5db', fontSize: 11, cursor: canUndo ? 'pointer' : 'default', margin: '0 2px' }}>
+        <Undo2 size={11} /> Annuler
+      </button>
+      <button onClick={onRedo} disabled={!canRedo} title="Rétablir (Ctrl+Y)"
+        style={{ display: 'flex', alignItems: 'center', gap: 3, padding: '4px 8px', borderRadius: 6, border: '1px solid #e2e8f0', background: canRedo ? 'white' : '#f9fafb', color: canRedo ? '#374151' : '#d1d5db', fontSize: 11, cursor: canRedo ? 'pointer' : 'default' }}>
+        <Redo2 size={11} /> Rétablir
+      </button>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════
-   MODE CONTEXT BAR (palette / hints per mode)
+   CARTE TAB — mode bar + context bar
    ══════════════════════════════════════════════ */
-function ContextBar({ editMode, activeBrush, setActiveBrush, onApplyAll, bulletinType,
-  brushType, setBrushType, brushNiveau, setBrushNiveau,
-}: {
-  editMode: EditMode; activeBrush: string | null; setActiveBrush: (b: string | null) => void;
-  onApplyAll: () => void; bulletinType: string;
-  brushType: string | null; setBrushType: (t: string | null) => void;
-  brushNiveau: string | null; setBrushNiveau: (n: string | null) => void;
+const CARTE_MODES: { mode: CarteMode; icon: string; label: string; color: string }[] = [
+  { mode: 'temperature', icon: '🌡️', label: 'Températures', color: '#dc2626' },
+  { mode: 'condition',   icon: '☁️',  label: 'Nébulosité',  color: '#8b5cf6' },
+  { mode: 'vent',        icon: '💨',  label: 'Vent',        color: '#0ea5e9' },
+];
+
+function CarteModeBar({ active, onChange }: { active: CarteMode; onChange: (m: CarteMode) => void }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      <span style={{ fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginRight: 4 }}>Mode</span>
+      {CARTE_MODES.map(({ mode, icon, label, color }) => {
+        const isActive = active === mode;
+        return (
+          <button key={mode} onClick={() => onChange(mode)} title={label}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px',
+              borderRadius: 7, background: isActive ? color : 'white',
+              border: `1.5px solid ${isActive ? color : '#e2e8f0'}`,
+              color: isActive ? 'white' : '#374151', fontWeight: isActive ? 700 : 500,
+              fontSize: 11, cursor: 'pointer', transition: 'all .12s',
+              boxShadow: isActive ? `0 2px 8px ${color}44` : 'none',
+            }}>
+            <span style={{ fontSize: 13 }}>{icon}</span> {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function CarteContextBar({ mode, activeBrush, setActiveBrush, onApplyAll }: {
+  mode: CarteMode; activeBrush: string | null; setActiveBrush: (b: string | null) => void; onApplyAll: () => void;
 }) {
-  if (editMode === 'condition') {
+  if (mode === 'condition') {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6, padding: '5px 12px',
-        background: '#faf5ff', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: 1 }}>
-          ☁️ Pinceau condition
-        </span>
-        <div style={{ display: 'flex', gap: 5 }}>
-          {CONDITIONS.map((c) => {
-            const active = activeBrush === c.value;
-            return (
-              <button
-                key={c.value}
-                onClick={() => setActiveBrush(active ? null : c.value)}
-                title={c.label}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  padding: '4px 8px', borderRadius: 8,
-                  border: `2px solid ${active ? '#8b5cf6' : '#e2e8f0'}`,
-                  background: active ? '#f3e8ff' : 'white',
-                  cursor: 'pointer', gap: 2, transition: 'all .12s',
-                  transform: active ? 'scale(1.1)' : 'scale(1)',
-                  boxShadow: active ? '0 2px 8px #8b5cf655' : 'none',
-                }}
-              >
-                <span style={{ fontSize: 20 }}>{c.icon}</span>
-                <span style={{ fontSize: 9, fontWeight: active ? 700 : 500, color: active ? '#8b5cf6' : '#6b7280' }}>{c.label}</span>
-              </button>
-            );
-          })}
-        </div>
-        {activeBrush && (
-          <>
-            <div style={{ width: 1, height: 32, background: '#e2e8f0' }} />
-            <button
-              onClick={onApplyAll}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: '#faf5ff', borderBottom: '1px solid #e2e8f0', flexWrap: 'wrap', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: 1 }}>☁️ Pinceau</span>
+        {CONDITIONS.map((c) => {
+          const active = activeBrush === c.value;
+          return (
+            <button key={c.value} onClick={() => setActiveBrush(active ? null : c.value)} title={c.label}
               style={{
-                fontSize: 11, padding: '4px 12px', borderRadius: 7,
-                background: '#8b5cf6', color: 'white', border: 'none',
-                cursor: 'pointer', fontWeight: 700,
-              }}
-            >Appliquer à toutes les villes</button>
-          </>
+                display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2px 6px', borderRadius: 7,
+                border: `2px solid ${active ? '#8b5cf6' : '#e2e8f0'}`, background: active ? '#f3e8ff' : 'white',
+                cursor: 'pointer', gap: 1, transform: active ? 'scale(1.08)' : 'scale(1)', transition: 'all .12s',
+              }}>
+              <span style={{ fontSize: 18 }}>{c.icon}</span>
+              <span style={{ fontSize: 8, fontWeight: active ? 800 : 500, color: active ? '#7c3aed' : '#6b7280' }}>{c.label}</span>
+            </button>
+          );
+        })}
+        {activeBrush && (
+          <button onClick={onApplyAll} style={{ fontSize: 10, padding: '3px 10px', borderRadius: 6, background: '#8b5cf6', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, marginLeft: 'auto' }}>
+            Appliquer à toutes les villes
+          </button>
         )}
-        {!activeBrush && (
-          <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 4 }}>← Cliquez une icône pour sélectionner le pinceau, puis cliquez les villes sur la carte</span>
-        )}
+        {!activeBrush && <span style={{ fontSize: 10, color: '#94a3b8' }}>← Choisissez un état, puis cliquez les villes</span>}
       </div>
     );
   }
-
-  if (editMode === 'vigilance') {
-    const hasBrush = !!activeBrush;
+  if (mode === 'temperature') {
     return (
-      <div style={{
-        display: 'flex', flexDirection: 'column', gap: 0,
-        background: '#fffbeb', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
-      }}>
-        {/* Row 1 — Phenomenon type */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', flexWrap: 'wrap', borderBottom: '1px solid #fde68a' }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 90 }}>
-            ① Phénomène
-          </span>
-          {VIGILANCE_TYPES.filter(t => t.value !== 'aucun').map((t) => {
-            const active = brushType === t.value;
-            return (
-              <button
-                key={t.value}
-                onClick={() => setBrushType(active ? null : t.value)}
-                title={t.label}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center',
-                  padding: '3px 7px', borderRadius: 7,
-                  border: `2px solid ${active ? '#b45309' : '#fde68a'}`,
-                  background: active ? '#fef3c7' : 'white',
-                  cursor: 'pointer', gap: 1, transition: 'all .12s',
-                  boxShadow: active ? '0 0 0 2px #b4530966' : 'none',
-                }}
-              >
-                <span style={{ fontSize: 17 }}>{t.icon}</span>
-                <span style={{ fontSize: 8, fontWeight: active ? 800 : 500, color: active ? '#92400e' : '#6b7280', whiteSpace: 'nowrap' }}>
-                  {t.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Row 2 — Severity level */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 90 }}>
-            ② Niveau
-          </span>
-          {VIGILANCE_NIVEAUX.map((v) => {
-            const active = brushNiveau === v.value;
-            return (
-              <button
-                key={v.value}
-                onClick={() => setBrushNiveau(active ? null : v.value)}
-                title={v.label}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 7, padding: '4px 11px',
-                  borderRadius: 8, border: `2px solid ${v.color}`,
-                  background: active ? v.color : v.bg,
-                  color: active ? 'white' : v.color,
-                  fontWeight: active ? 800 : 600, fontSize: 11, cursor: 'pointer',
-                  transform: active ? 'scale(1.06)' : 'scale(1)',
-                  boxShadow: active ? `0 2px 8px ${v.color}55` : 'none',
-                  transition: 'all .12s',
-                }}
-              >
-                <span style={{ width: 9, height: 9, borderRadius: '50%', background: active ? 'white' : v.color, display: 'inline-block', flexShrink: 0 }} />
-                {v.label}
-              </button>
-            );
-          })}
-          {hasBrush && (
-            <>
-              <div style={{ width: 1, height: 28, background: '#fde68a', marginLeft: 4 }} />
-              <div style={{ fontSize: 11, color: '#92400e', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
-                {brushType ? `${VIGILANCE_TYPES.find(t => t.value === brushType)?.icon} ${VIGILANCE_TYPES.find(t => t.value === brushType)?.label}` : '⚠️ Choisissez ①'}
-                {' + '}
-                {brushNiveau ? VIGILANCE_NIVEAUX.find(n => n.value === brushNiveau)?.label : '⚠️ Choisissez ②'}
-                {' → cliquez ou glissez sur les régions'}
-              </div>
-              <button
-                onClick={onApplyAll}
-                style={{
-                  fontSize: 10, padding: '3px 10px', borderRadius: 6,
-                  background: '#f59e0b', color: 'white', border: 'none',
-                  cursor: 'pointer', fontWeight: 700, marginLeft: 'auto',
-                }}
-              >Peindre toutes les régions</button>
-            </>
-          )}
-          {!hasBrush && (
-            <span style={{ fontSize: 10, color: '#a16207', marginLeft: 4 }}>
-              ← Choisissez ① un phénomène et ② un niveau de gravité, puis peignez les régions
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (editMode === 'temperature') {
-    return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px',
-        background: '#fff5f5', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: 1 }}>
-          🌡️ Températures
-        </span>
-        <span style={{ fontSize: 11, color: '#94a3b8' }}>
-          Cliquez un marqueur pour éditer · Molette sur le marqueur = ±1°C instantané
-        </span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
-          {[
-            { label: '&lt;25°', color: '#3b82f6' }, { label: '25–30°', color: '#10b981' },
-            { label: '30–35°', color: '#f59e0b' }, { label: '35–40°', color: '#f97316' },
-            { label: '&gt;40°', color: '#ef4444' },
-          ].map((e) => (
-            <span key={e.label} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 10, color: '#374151' }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', background: e.color, display: 'inline-block' }} />
-              <span dangerouslySetInnerHTML={{ __html: e.label }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: '#fff5f5', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: 1 }}>🌡️ Températures</span>
+        <span style={{ fontSize: 10, color: '#94a3b8' }}>Cliquez un marqueur · Molette = ±1°C</span>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 5, alignItems: 'center' }}>
+          {[['<25°','#3b82f6'],['25–30°','#10b981'],['30–35°','#f59e0b'],['35–40°','#f97316'],['>40°','#ef4444']].map(([l,c]) => (
+            <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 2, fontSize: 9, color: '#374151' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: c, display: 'inline-block' }} />{l}
             </span>
           ))}
         </div>
       </div>
     );
   }
-
-  if (editMode === 'vent') {
+  if (mode === 'vent') {
     return (
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '5px 12px',
-        background: '#f0f9ff', borderBottom: '1px solid #e2e8f0', flexShrink: 0,
-      }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: 1 }}>
-          💨 Vent
-        </span>
-        <span style={{ fontSize: 11, color: '#94a3b8' }}>
-          Cliquez un marqueur → rose des vents interactive pour direction + vitesse
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 10px', background: '#f0f9ff', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, color: '#0ea5e9', textTransform: 'uppercase', letterSpacing: 1 }}>💨 Vent</span>
+        <span style={{ fontSize: 10, color: '#94a3b8' }}>Cliquez un marqueur → rose des vents + vitesse</span>
       </div>
     );
   }
-
   return null;
 }
 
 /* ══════════════════════════════════════════════
-   CITY LIST SIDEBAR (collapsed by default)
+   REGION TABLE (Vigilance tab sidebar)
    ══════════════════════════════════════════════ */
-function CityListSidebar({ villes, editMode, onSelect, selectedName, clipboard, onCopyCity, onPasteCity }: {
-  villes: VilleData[]; editMode: EditMode;
-  onSelect: (name: string) => void; selectedName: string | null;
-  clipboard: VilleData | null;
-  onCopyCity: (name: string) => void; onPasteCity: (name: string) => void;
+function RegionTable({ vigilanceNiveaux, onUpdate }: {
+  vigilanceNiveaux: any[];
+  onUpdate: (region: string, patch: { type?: string; niveau?: string }) => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <div style={{
-      width: open ? 220 : 36, flexShrink: 0,
-      background: '#f8fafc', borderRight: '1px solid #e2e8f0',
-      transition: 'width .2s', overflow: 'hidden', display: 'flex', flexDirection: 'column',
-    }}>
-      <button
-        onClick={() => setOpen((p) => !p)}
-        title={open ? 'Fermer la liste' : 'Liste des villes'}
-        style={{
-          flexShrink: 0, width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: '#374151',
-          borderBottom: '1px solid #e2e8f0',
-        }}
-      >{open ? '◀' : '🏙️'}</button>
-      {open && (
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          <div style={{ padding: '6px 8px', fontSize: 10, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>
-            Villes ({villes.length})
-          </div>
-          {villes.map((v) => {
-            const isSel = selectedName === v.nom;
-            return (
-              <div
-                key={v.nom}
-                onClick={() => onSelect(v.nom)}
-                style={{
-                  padding: '5px 8px', cursor: 'pointer', fontSize: 11,
-                  background: isSel ? '#dbeafe' : 'transparent',
-                  borderLeft: isSel ? '3px solid #2563eb' : '3px solid transparent',
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                }}
+    <div style={{ width: 240, flexShrink: 0, borderLeft: '1px solid #e2e8f0', background: '#fafafa', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div style={{ padding: '5px 8px', fontSize: 10, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, background: '#f1f5f9', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+        Régions — vigilance individuelle
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+        {(vigilanceNiveaux ?? []).map((v: any) => {
+          const niveauInfo = VIGILANCE_NIVEAUX.find((n) => n.value === v.niveau);
+          return (
+            <div key={v.region} style={{
+              padding: '7px 8px', borderBottom: '1px solid #f1f5f9',
+              borderLeft: `3px solid ${niveauInfo?.color ?? '#2fb84a'}`,
+            }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: '#1f2937', marginBottom: 4 }}>{v.region}</div>
+              {/* Type dropdown */}
+              <select
+                value={v.type ?? 'aucun'}
+                onChange={(e) => onUpdate(v.region, { type: e.target.value })}
+                style={{ fontSize: 10, padding: '2px 4px', borderRadius: 4, border: '1px solid #e2e8f0', background: 'white', width: '100%', marginBottom: 5 }}
               >
-                <div>
-                  <div style={{ fontWeight: isSel ? 700 : 500, color: isSel ? '#1d4ed8' : '#374151' }}>{v.nom}</div>
-                  <div style={{ color: '#94a3b8', fontSize: 10 }}>
-                    {v.tmax !== null ? `${v.tmax}° / ${v.tmin ?? '–'}°` : '–'}
-                    {v.directionVent ? ` · ${v.directionVent}` : ''}
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 2 }}>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onCopyCity(v.nom); }}
-                    title="Copier"
-                    style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}
-                  >📋</button>
-                  {clipboard && clipboard.nom !== v.nom && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onPasteCity(v.nom); }}
-                      title={`Coller depuis ${clipboard.nom}`}
-                      style={{ fontSize: 10, padding: '1px 4px', borderRadius: 4, border: '1px solid #bfdbfe', background: '#eff6ff', cursor: 'pointer' }}
-                    >📌</button>
-                  )}
-                </div>
+                {VIGILANCE_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                ))}
+              </select>
+              {/* Level dots */}
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+                {VIGILANCE_NIVEAUX.map((n) => (
+                  <button key={n.value} onClick={() => onUpdate(v.region, { niveau: n.value })} title={n.label}
+                    style={{
+                      width: 16, height: 16, borderRadius: '50%', background: n.color,
+                      border: v.niveau === n.value ? '2px solid #1d4ed8' : '1.5px solid rgba(0,0,0,0.25)',
+                      cursor: 'pointer', padding: 0, transition: 'transform .1s',
+                      transform: v.niveau === n.value ? 'scale(1.25)' : 'scale(1)',
+                    }}
+                  />
+                ))}
+                <span style={{ fontSize: 9, color: '#94a3b8', marginLeft: 2 }}>{niveauInfo?.label}</span>
               </div>
-            );
-          })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   VIGILANCE CONTEXT BAR (type + level brush)
+   ══════════════════════════════════════════════ */
+function VigilanceContextBar({ activeBrush, brushType, setBrushType, brushNiveau, setBrushNiveau, onApplyAll }: {
+  activeBrush: string | null;
+  brushType: string | null; setBrushType: (t: string | null) => void;
+  brushNiveau: string | null; setBrushNiveau: (n: string | null) => void;
+  onApplyAll: () => void;
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', background: '#fffbeb', borderBottom: '1px solid #e2e8f0', flexShrink: 0 }}>
+      {/* Row 1 — Phenomenon */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', flexWrap: 'wrap', borderBottom: '1px solid #fde68a' }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 70 }}>① Phénomène</span>
+        {VIGILANCE_TYPES.filter((t) => t.value !== 'aucun').map((t) => {
+          const active = brushType === t.value;
+          return (
+            <button key={t.value} onClick={() => setBrushType(active ? null : t.value)} title={t.label}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '2px 6px', borderRadius: 6,
+                border: `2px solid ${active ? '#b45309' : '#fde68a'}`, background: active ? '#fef3c7' : 'white',
+                cursor: 'pointer', gap: 1, boxShadow: active ? '0 0 0 2px #b4530966' : 'none', transition: 'all .1s',
+              }}>
+              <span style={{ fontSize: 16 }}>{t.icon}</span>
+              <span style={{ fontSize: 7.5, fontWeight: active ? 800 : 500, color: active ? '#92400e' : '#6b7280', whiteSpace: 'nowrap' }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      {/* Row 2 — Level */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 10, fontWeight: 800, color: '#92400e', textTransform: 'uppercase', letterSpacing: 1, minWidth: 70 }}>② Niveau</span>
+        {VIGILANCE_NIVEAUX.map((v) => {
+          const active = brushNiveau === v.value;
+          return (
+            <button key={v.value} onClick={() => setBrushNiveau(active ? null : v.value)} title={v.label}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 7,
+                border: `2px solid ${v.color}`, background: active ? v.color : v.bg,
+                color: active ? 'white' : v.color, fontWeight: active ? 800 : 600, fontSize: 10,
+                cursor: 'pointer', transform: active ? 'scale(1.05)' : 'scale(1)', transition: 'all .1s',
+              }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: active ? 'white' : v.color, display: 'inline-block', flexShrink: 0 }} />
+              {v.label}
+            </button>
+          );
+        })}
+        {activeBrush && (
+          <>
+            <div style={{ width: 1, height: 24, background: '#fde68a', marginLeft: 4 }} />
+            <span style={{ fontSize: 10, color: '#92400e', fontWeight: 600 }}>
+              {VIGILANCE_TYPES.find((t) => t.value === brushType)?.icon} + {VIGILANCE_NIVEAUX.find((n) => n.value === brushNiveau)?.label} → cliquez / glissez
+            </span>
+            <button onClick={onApplyAll}
+              style={{ marginLeft: 'auto', fontSize: 10, padding: '3px 10px', borderRadius: 6, background: '#f59e0b', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700 }}>
+              Toutes les régions
+            </button>
+          </>
+        )}
+        {!activeBrush && (
+          <span style={{ fontSize: 10, color: '#a16207' }}>← ① Phénomène + ② Niveau, puis peignez les régions</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   TEXTES TAB
+   ══════════════════════════════════════════════ */
+const SG_FIELDS = [
+  { key: 'ciel',         label: '☁️ Ciel',        placeholder: 'Ex: un ciel partiellement nuageux à couvert…',       categorie: 'ciel'         },
+  { key: 'vents',        label: '💨 Vents',        placeholder: 'Ex: des vents de mousson d\'intensité modérée…',     categorie: 'vents'        },
+  { key: 'visibilite',   label: '👁️ Visibilité',   placeholder: 'Ex: une visibilité assez bonne dans l\'ensemble…',   categorie: 'visibilite'   },
+  { key: 'orages',       label: '⛈️ Orages',       placeholder: 'Ex: des orages isolés accompagnés de pluies…',      categorie: 'orages'       },
+  { key: 'temperatures', label: '🌡️ Températures', placeholder: 'Ex: des températures en légère hausse…',            categorie: 'temperatures' },
+];
+
+function TextesTab({ sg, onChange, previousBulletin, onImportFromPrevious }: {
+  sg: Bulletin['situationGenerale'];
+  onChange: (field: string, value: string) => void;
+  previousBulletin: Bulletin | null;
+  onImportFromPrevious: () => void;
+}) {
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* Import banner */}
+      {previousBulletin && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: '#f0f9ff', border: '1px solid #bae6fd', borderRadius: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 12, color: '#0369a1' }}>📅 Bulletin du <strong>{previousBulletin.periodLabel}</strong> disponible</span>
+          <button onClick={onImportFromPrevious}
+            style={{ fontSize: 11, padding: '3px 12px', borderRadius: 6, background: '#0369a1', color: 'white', border: 'none', cursor: 'pointer', fontWeight: 700, marginLeft: 'auto' }}>
+            Importer les textes de la veille
+          </button>
         </div>
       )}
+
+      {/* Text fields */}
+      {SG_FIELDS.map((f) => (
+        <div key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <label style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>{f.label}</label>
+            <TemplateSelector categorie={f.categorie} onSelect={(text) => onChange(f.key, text)} />
+          </div>
+          <Textarea
+            rows={3}
+            value={(sg as any)[f.key] || ''}
+            placeholder={f.placeholder}
+            onChange={(e) => onChange(f.key, e.target.value)}
+            className="text-xs resize-y"
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -482,6 +390,7 @@ export function EditBulletin() {
   const { data: bulletin, isLoading } = useGetBulletin(id, {
     query: { enabled: !!id, queryKey: getGetBulletinQueryKey(id) },
   });
+  const { data: allBulletins } = useListBulletins();
   const updateMutation = useUpdateBulletin();
 
   const [formData, setFormData] = useState<Bulletin | null>(null);
@@ -492,20 +401,22 @@ export function EditBulletin() {
   const [selectedEntity, setSelectedEntity] = useState<SelectedEntity>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
-  // Studio state
-  const [editMode, setEditMode] = useState<EditMode>('temperature');
+  /* Studio state */
+  const [activeTab, setActiveTab] = useState<StudioTab>('carte');
+  const [carteMode, setCarteMode] = useState<CarteMode>('temperature');
   const [activeBrush, setActiveBrush] = useState<string | null>(null);
-  // Vigilance brush: type + niveau encoded as "type|niveau"
   const [brushType, setBrushType]   = useState<string | null>(null);
   const [brushNiveau, setBrushNiveau] = useState<string | null>(null);
   const [clipboard, setClipboard] = useState<VilleData | null>(null);
 
-  // Undo / redo history
+  /* Derived editMode for the map component */
+  const editMode: EditMode = activeTab === 'vigilance' ? 'vigilance' : carteMode;
+
+  /* Undo / redo history */
   const history = useRef<Snapshot[]>([]);
   const historyIdx = useRef<number>(-1);
 
   const pushHistory = useCallback((snap: Snapshot) => {
-    // Truncate future states
     history.current = history.current.slice(0, historyIdx.current + 1);
     history.current.push(snap);
     if (history.current.length > MAX_HISTORY) history.current.shift();
@@ -541,7 +452,7 @@ export function EditBulletin() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canRedo]);
 
-  // Keyboard shortcuts
+  /* Keyboard shortcuts */
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
@@ -570,13 +481,12 @@ export function EditBulletin() {
         ? bulletin.vigilanceNiveaux : getInitialVigilanceData();
       const fd = { ...bulletin, donneesVilles: merged, vigilanceNiveaux: vigilance };
       setFormData(fd);
-      // Seed history
       history.current = [{ villes: merged, vigilance }];
       historyIdx.current = 0;
     }
   }, [bulletin, id]);
 
-  /* Auto-save ref (kept stable) */
+  /* Auto-save ref */
   const triggerSaveRef = useRef<(data: Bulletin) => void>(() => {});
   useEffect(() => {
     triggerSaveRef.current = (newData: Bulletin) => {
@@ -612,7 +522,7 @@ export function EditBulletin() {
     });
   }, []);
 
-  /* Update one city (with history) */
+  /* Update one city */
   const updateVille = useCallback((cityName: string, field: string, value: any) => {
     setFormData((prev) => {
       if (!prev) return prev;
@@ -626,25 +536,37 @@ export function EditBulletin() {
     });
   }, [pushHistory]);
 
-  /* Paste clipboard to a city */
+  /* Update one vigilance region */
+  const updateVigilanceRegion = useCallback((regionName: string, patch: { type?: string; niveau?: string }) => {
+    setFormData((prev) => {
+      if (!prev) return prev;
+      const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v: any) =>
+        v.region === regionName ? { ...v, ...patch } : v
+      );
+      const next = { ...prev, vigilanceNiveaux };
+      pushHistory({ villes: prev.donneesVilles, vigilance: vigilanceNiveaux });
+      triggerSaveRef.current(next);
+      return next;
+    });
+  }, [pushHistory]);
+
+  /* Paste clipboard to city */
   const pasteToCity = useCallback((cityName: string) => {
     if (!clipboard) return;
     setFormData((prev) => {
       if (!prev) return prev;
       const donneesVilles = prev.donneesVilles.map((v) =>
-        v.nom === cityName
-          ? { ...clipboard, nom: cityName }
-          : v
+        v.nom === cityName ? { ...clipboard, nom: cityName } : v
       );
       const next = { ...prev, donneesVilles };
       pushHistory({ villes: donneesVilles, vigilance: prev.vigilanceNiveaux ?? [] });
       triggerSaveRef.current(next);
-      toast({ title: `Données collées sur ${cityName}`, description: `Source : ${clipboard.nom}` });
+      toast({ title: `Collé sur ${cityName}`, description: `Source : ${clipboard.nom}` });
       return next;
     });
   }, [clipboard, pushHistory, toast]);
 
-  /* Scroll wheel ±1°C on city marker */
+  /* Scroll wheel ±1°C */
   const handleTempScroll = useCallback((cityName: string, delta: number) => {
     setFormData((prev) => {
       if (!prev) return prev;
@@ -659,21 +581,20 @@ export function EditBulletin() {
     });
   }, []);
 
-  /* Paint city condition (brush mode) */
+  /* Paint city condition */
   const paintCity = useCallback((cityName: string) => {
     if (!activeBrush) return;
     updateVille(cityName, 'condition', activeBrush);
   }, [activeBrush, updateVille]);
 
-  /* Paint region vigilance (brush mode) — activeBrush encodes "type|niveau" */
+  /* Paint region vigilance */
   const paintRegion = useCallback((regionName: string) => {
     if (!activeBrush) return;
     const [type, niveau] = activeBrush.includes('|')
-      ? activeBrush.split('|')
-      : ['aucun', activeBrush];
+      ? activeBrush.split('|') : ['aucun', activeBrush];
     setFormData((prev) => {
       if (!prev) return prev;
-      const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) =>
+      const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v: any) =>
         v.region === regionName ? { ...v, niveau, type } : v
       );
       const next = { ...prev, vigilanceNiveaux };
@@ -692,38 +613,44 @@ export function EditBulletin() {
         const next = { ...prev, donneesVilles };
         pushHistory({ villes: donneesVilles, vigilance: prev.vigilanceNiveaux ?? [] });
         triggerSaveRef.current(next);
-        toast({ title: `Condition appliquée à toutes les villes` });
+        toast({ title: 'Condition appliquée à toutes les villes' });
         return next;
       });
     } else if (editMode === 'vigilance') {
       const [type, niveau] = activeBrush.includes('|')
-        ? activeBrush.split('|')
-        : ['aucun', activeBrush];
+        ? activeBrush.split('|') : ['aucun', activeBrush];
       setFormData((prev) => {
         if (!prev) return prev;
-        const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) => ({ ...v, niveau, type }));
+        const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v: any) => ({ ...v, niveau, type }));
         const next = { ...prev, vigilanceNiveaux };
         pushHistory({ villes: prev.donneesVilles, vigilance: vigilanceNiveaux });
         triggerSaveRef.current(next);
-        toast({ title: `Vigilance appliquée à toutes les régions` });
+        toast({ title: 'Vigilance appliquée à toutes les régions' });
         return next;
       });
     }
   }, [activeBrush, editMode, formData, pushHistory, toast]);
 
-  /* Update vigilance for region */
-  const updateVigilance = useCallback((regionName: string, niveau: string) => {
-    setFormData((prev) => {
-      if (!prev) return prev;
-      const vigilanceNiveaux = (prev.vigilanceNiveaux ?? []).map((v) =>
-        v.region === regionName ? { ...v, niveau } : v
-      );
-      const next = { ...prev, vigilanceNiveaux };
-      pushHistory({ villes: prev.donneesVilles, vigilance: vigilanceNiveaux });
-      triggerSaveRef.current(next);
-      return next;
-    });
-  }, [pushHistory]);
+  /* Sync vigilance brush */
+  useEffect(() => {
+    if (activeTab === 'vigilance' && brushType && brushNiveau) {
+      setActiveBrush(`${brushType}|${brushNiveau}`);
+    } else if (activeTab === 'vigilance') {
+      setActiveBrush(null);
+    }
+  }, [activeTab, brushType, brushNiveau]);
+
+  /* Switch tabs */
+  const switchTab = (tab: StudioTab) => {
+    setActiveTab(tab);
+    setSelectedEntity(null);
+    if (tab !== 'vigilance') {
+      setActiveBrush(null);
+    }
+    if (tab !== 'carte') {
+      setActiveBrush(null);
+    }
+  };
 
   /* Live weather */
   const loadWeather = useCallback(async () => {
@@ -742,7 +669,7 @@ export function EditBulletin() {
         triggerSaveRef.current(next);
         return next;
       });
-      toast({ title: '✓ Températures chargées', description: 'Open-Meteo appliqué.' });
+      toast({ title: '✓ Températures chargées via Open-Meteo' });
     } catch {
       toast({ title: 'Erreur météo', variant: 'destructive' });
     } finally { setWeatherLoading(false); }
@@ -755,23 +682,20 @@ export function EditBulletin() {
     update({ bulletinDate: dateStr, periodLabel: label });
   };
 
-  /* Sync brushType + brushNiveau → activeBrush for vigilance mode */
-  useEffect(() => {
-    if (editMode === 'vigilance' && brushType && brushNiveau) {
-      setActiveBrush(`${brushType}|${brushNiveau}`);
-    } else if (editMode === 'vigilance') {
-      setActiveBrush(null);
-    }
-  }, [editMode, brushType, brushNiveau]);
+  /* Previous bulletin (for copy from yesterday) */
+  const previousBulletin = useMemo(() => {
+    if (!allBulletins || !formData) return null;
+    return (allBulletins as Bulletin[])
+      .filter((b) => b.type === formData.type && b.bulletinDate < formData.bulletinDate && b.id !== formData.id)
+      .sort((a, b) => b.bulletinDate.localeCompare(a.bulletinDate))[0] ?? null;
+  }, [allBulletins, formData]);
 
-  /* Switch mode → clear brush and selection */
-  const switchMode = (mode: EditMode) => {
-    setEditMode(mode);
-    setActiveBrush(null);
-    setBrushType(null);
-    setBrushNiveau(null);
-    setSelectedEntity(null);
-  };
+  /* Import SG from yesterday */
+  const importFromPrevious = useCallback(() => {
+    if (!previousBulletin) return;
+    update({ situationGenerale: previousBulletin.situationGenerale });
+    toast({ title: 'Textes importés', description: `Depuis le ${previousBulletin.periodLabel}` });
+  }, [previousBulletin, update, toast]);
 
   /* ── Loading ── */
   if (isLoading || !formData) {
@@ -783,11 +707,7 @@ export function EditBulletin() {
   }
 
   const selectedVille = selectedEntity?.type === 'city'
-    ? formData.donneesVilles.find((v) => v.nom === selectedEntity.name) ?? null
-    : null;
-  const selectedVigilance = selectedEntity?.type === 'region'
-    ? formData.vigilanceNiveaux?.find((v) => v.region === selectedEntity.name) ?? null
-    : null;
+    ? formData.donneesVilles.find((v) => v.nom === selectedEntity.name) ?? null : null;
   const showTmin = ['radio', 'national', 'journaux'].includes(formData.type);
 
   /* ══════════ RENDER ══════════ */
@@ -795,22 +715,22 @@ export function EditBulletin() {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── TOP BAR ── */}
-      <div
-        className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0 flex-wrap"
-        style={{ background: '#0d1f3c', minHeight: 52 }}
-      >
+      <div className="flex items-center gap-3 px-4 py-2 border-b flex-shrink-0 flex-wrap no-print"
+        style={{ background: '#0d1f3c', minHeight: 52 }}>
         <button onClick={() => setLocation('/historique')}
           className="text-white/80 hover:text-white flex items-center gap-1 text-sm">
           <ChevronLeft size={16} /> Retour
         </button>
         <div className="h-4 w-px bg-white/20" />
 
-        {/* Type pills */}
+        {/* Type pills — affect preview output */}
         <div className="flex gap-1">
           {BULLETIN_TYPES.map((bt) => (
             <button key={bt.value} onClick={() => update({ type: bt.value as Bulletin['type'] })}
               className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${
-                formData.type === bt.value ? 'bg-white text-[#0d1f3c]' : 'text-white/70 hover:text-white hover:bg-white/10'
+                formData.type === bt.value
+                  ? 'bg-white text-[#0d1f3c]'
+                  : 'text-white/70 hover:text-white hover:bg-white/10'
               }`}>
               {bt.emoji} {bt.label}
             </button>
@@ -818,7 +738,7 @@ export function EditBulletin() {
         </div>
         <div className="h-4 w-px bg-white/20" />
 
-        {/* Date */}
+        {/* Date + metadata */}
         <div className="flex items-center gap-1">
           <span className="text-white/60 text-xs">Date:</span>
           <input type="date" value={formData.bulletinDate} onChange={(e) => handleDateChange(e.target.value)}
@@ -846,8 +766,7 @@ export function EditBulletin() {
             {weatherLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
             Météo live
           </button>
-          <button
-            onClick={() => window.open(`/bulletins/${id}/preview?print=true`, '_blank')}
+          <button onClick={() => window.open(`/bulletins/${id}/preview?print=true`, '_blank')}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-bold transition-all"
             style={{ background: '#c8a44a', color: '#0d1f3c' }}>
             <Printer size={13} /> Imprimer PDF
@@ -858,112 +777,129 @@ export function EditBulletin() {
       {/* ── MAIN SPLIT ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
 
-        {/* ════ LEFT: Map panel ════ */}
-        <div className="flex flex-col border-r overflow-hidden" style={{ width: '55%' }}>
+        {/* ════ LEFT: Studio tabs ════ */}
+        <div className="flex flex-col border-r overflow-hidden" style={{ width: '52%' }}>
 
-          {/* SG accordion */}
-          <SituationGeneralePanel
-            sg={formData.situationGenerale}
-            onChange={(field, value) =>
-              update({ situationGenerale: { ...formData.situationGenerale, [field]: value } })
-            }
-          />
-
-          {/* Mode toolbar */}
-          <ModeToolbar
-            active={editMode}
-            onChange={switchMode}
+          {/* Tab bar + undo/redo */}
+          <StudioTabBar
+            active={activeTab}
+            onChange={switchTab}
             canUndo={canUndo}
             canRedo={canRedo}
             onUndo={undo}
             onRedo={redo}
           />
 
-          {/* Context bar */}
-          <ContextBar
-            editMode={editMode}
-            activeBrush={activeBrush}
-            setActiveBrush={setActiveBrush}
-            onApplyAll={applyBrushAll}
-            bulletinType={formData.type}
-            brushType={brushType}
-            setBrushType={setBrushType}
-            brushNiveau={brushNiveau}
-            setBrushNiveau={setBrushNiveau}
-          />
+          {/* ── TAB: Carte météo ── */}
+          {activeTab === 'carte' && (
+            <>
+              <CarteModeBar active={carteMode} onChange={(m) => { setCarteMode(m); setActiveBrush(null); setSelectedEntity(null); }} />
+              <CarteContextBar mode={carteMode} activeBrush={activeBrush} setActiveBrush={setActiveBrush} onApplyAll={applyBrushAll} />
 
-          {/* Map area + city sidebar */}
-          <div className="flex flex-1 min-h-0 overflow-hidden">
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                {/* City list sidebar */}
+                <CityListSidebar
+                  villes={formData.donneesVilles as VilleData[]}
+                  selectedName={selectedEntity?.type === 'city' ? selectedEntity.name : null}
+                  onSelect={(name) => setSelectedEntity({ type: 'city', name })}
+                  clipboard={clipboard}
+                  onCopyCity={(name) => {
+                    const v = formData.donneesVilles.find((d) => d.nom === name);
+                    if (v) { setClipboard(v as VilleData); toast({ title: `${name} copié` }); }
+                  }}
+                  onPasteCity={pasteToCity}
+                />
+                {/* Map */}
+                <div className="flex-1 min-h-0 min-w-0">
+                  <MaliInteractiveMap
+                    donneesVilles={formData.donneesVilles as VilleData[]}
+                    vigilanceNiveaux={formData.vigilanceNiveaux ?? []}
+                    bulletinType={formData.type}
+                    geoJson={geoJson}
+                    selectedEntity={selectedEntity}
+                    onSelect={setSelectedEntity}
+                    editMode={editMode}
+                    activeBrush={activeBrush}
+                    onPaintCity={paintCity}
+                    onPaintRegion={paintRegion}
+                    onTempScroll={handleTempScroll}
+                  />
+                </div>
+              </div>
 
-            {/* City list sidebar (collapsible) */}
-            <CityListSidebar
-              villes={formData.donneesVilles as VilleData[]}
-              editMode={editMode}
-              selectedName={selectedEntity?.type === 'city' ? selectedEntity.name : null}
-              onSelect={(name) => setSelectedEntity({ type: 'city', name })}
-              clipboard={clipboard}
-              onCopyCity={(name) => {
-                const v = formData.donneesVilles.find((d) => d.nom === name);
-                if (v) { setClipboard(v as VilleData); toast({ title: `${name} copié dans le presse-papier` }); }
-              }}
-              onPasteCity={pasteToCity}
-            />
+              {/* Bottom panels */}
+              {carteMode === 'temperature' && selectedEntity?.type === 'city' && selectedVille && (
+                <TempPanel
+                  cityName={selectedEntity.name}
+                  villeData={selectedVille as VilleData}
+                  showTmin={showTmin}
+                  clipboard={clipboard}
+                  onUpdate={(field, value) => updateVille(selectedEntity.name, field, value)}
+                  onCopy={() => { setClipboard(selectedVille as VilleData); toast({ title: `${selectedEntity.name} copié` }); }}
+                  onPaste={() => pasteToCity(selectedEntity.name)}
+                  onClose={() => setSelectedEntity(null)}
+                />
+              )}
+              {carteMode === 'vent' && selectedEntity?.type === 'city' && selectedVille && (
+                <WindPanel
+                  cityName={selectedEntity.name}
+                  villeData={selectedVille as VilleData}
+                  clipboard={clipboard}
+                  onUpdate={(field, value) => updateVille(selectedEntity.name, field, value)}
+                  onCopy={() => { setClipboard(selectedVille as VilleData); toast({ title: `${selectedEntity.name} copié` }); }}
+                  onPaste={() => pasteToCity(selectedEntity.name)}
+                  onClose={() => setSelectedEntity(null)}
+                />
+              )}
+            </>
+          )}
 
-            {/* The map */}
-            <div className="flex-1 min-h-0 min-w-0">
-              <MaliInteractiveMap
-                donneesVilles={formData.donneesVilles as VilleData[]}
-                vigilanceNiveaux={formData.vigilanceNiveaux ?? []}
-                bulletinType={formData.type}
-                geoJson={geoJson}
-                selectedEntity={selectedEntity}
-                onSelect={setSelectedEntity}
-                editMode={editMode}
+          {/* ── TAB: Vigilance ── */}
+          {activeTab === 'vigilance' && (
+            <>
+              <VigilanceContextBar
                 activeBrush={activeBrush}
-                onPaintCity={paintCity}
-                onPaintRegion={paintRegion}
-                onTempScroll={handleTempScroll}
+                brushType={brushType}
+                setBrushType={setBrushType}
+                brushNiveau={brushNiveau}
+                setBrushNiveau={setBrushNiveau}
+                onApplyAll={applyBrushAll}
               />
-            </div>
-          </div>
+              <div className="flex flex-1 min-h-0 overflow-hidden">
+                {/* Map in vigilance mode */}
+                <div className="flex-1 min-h-0 min-w-0">
+                  <MaliInteractiveMap
+                    donneesVilles={formData.donneesVilles as VilleData[]}
+                    vigilanceNiveaux={formData.vigilanceNiveaux ?? []}
+                    bulletinType="journaux"
+                    geoJson={geoJson}
+                    selectedEntity={selectedEntity}
+                    onSelect={setSelectedEntity}
+                    editMode="vigilance"
+                    activeBrush={activeBrush}
+                    onPaintCity={paintCity}
+                    onPaintRegion={paintRegion}
+                    onTempScroll={handleTempScroll}
+                  />
+                </div>
+                {/* Region table sidebar */}
+                <RegionTable
+                  vigilanceNiveaux={formData.vigilanceNiveaux ?? []}
+                  onUpdate={updateVigilanceRegion}
+                />
+              </div>
+            </>
+          )}
 
-          {/* Bottom edit panels (temp, wind, or vigilance fallback) */}
-          {editMode === 'temperature' && selectedEntity?.type === 'city' && selectedVille && (
-            <TempPanel
-              cityName={selectedEntity.name}
-              villeData={selectedVille as VilleData}
-              showTmin={showTmin}
-              clipboard={clipboard}
-              onUpdate={(field, value) => updateVille(selectedEntity.name, field, value)}
-              onCopy={() => {
-                setClipboard(selectedVille as VilleData);
-                toast({ title: `${selectedEntity.name} copié dans le presse-papier` });
-              }}
-              onPaste={() => pasteToCity(selectedEntity.name)}
-              onClose={() => setSelectedEntity(null)}
-            />
-          )}
-          {editMode === 'vent' && selectedEntity?.type === 'city' && selectedVille && (
-            <WindPanel
-              cityName={selectedEntity.name}
-              villeData={selectedVille as VilleData}
-              clipboard={clipboard}
-              onUpdate={(field, value) => updateVille(selectedEntity.name, field, value)}
-              onCopy={() => {
-                setClipboard(selectedVille as VilleData);
-                toast({ title: `${selectedEntity.name} copié dans le presse-papier` });
-              }}
-              onPaste={() => pasteToCity(selectedEntity.name)}
-              onClose={() => setSelectedEntity(null)}
-            />
-          )}
-          {/* Vigilance fallback panel (non-paint mode, region selected) */}
-          {editMode !== 'vigilance' && selectedEntity?.type === 'region' && selectedVigilance && (
-            <VigilanceEditPanel
-              regionName={selectedEntity.name}
-              niveau={selectedVigilance.niveau}
-              onUpdate={(niveau) => updateVigilance(selectedEntity.name, niveau)}
-              onClose={() => setSelectedEntity(null)}
+          {/* ── TAB: Textes ── */}
+          {activeTab === 'textes' && (
+            <TextesTab
+              sg={formData.situationGenerale}
+              onChange={(field, value) =>
+                update({ situationGenerale: { ...formData.situationGenerale, [field]: value } })
+              }
+              previousBulletin={previousBulletin}
+              onImportFromPrevious={importFromPrevious}
             />
           )}
         </div>
@@ -975,6 +911,55 @@ export function EditBulletin() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════
+   CITY LIST SIDEBAR (collapsible, inside Carte tab)
+   ══════════════════════════════════════════════ */
+function CityListSidebar({ villes, selectedName, onSelect, clipboard, onCopyCity, onPasteCity }: {
+  villes: VilleData[];
+  selectedName: string | null;
+  onSelect: (name: string) => void;
+  clipboard: VilleData | null;
+  onCopyCity: (name: string) => void;
+  onPasteCity: (name: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ width: open ? 210 : 34, flexShrink: 0, background: '#f8fafc', borderRight: '1px solid #e2e8f0', transition: 'width .18s', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <button onClick={() => setOpen((p) => !p)} title={open ? 'Fermer' : 'Liste des villes'}
+        style={{ flexShrink: 0, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#374151', borderBottom: '1px solid #e2e8f0' }}>
+        {open ? '◀' : '🏙️'}
+      </button>
+      {open && (
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ padding: '4px 8px', fontSize: 9, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>
+            Villes ({villes.length})
+          </div>
+          {villes.map((v) => {
+            const isSel = selectedName === v.nom;
+            return (
+              <div key={v.nom} onClick={() => onSelect(v.nom)}
+                style={{ padding: '4px 7px', cursor: 'pointer', fontSize: 10.5, background: isSel ? '#dbeafe' : 'transparent', borderLeft: isSel ? '3px solid #2563eb' : '3px solid transparent', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ fontWeight: isSel ? 700 : 500, color: isSel ? '#1d4ed8' : '#374151' }}>{v.nom}</div>
+                  <div style={{ color: '#94a3b8', fontSize: 9 }}>{v.tmax !== null ? `${v.tmax}°/${v.tmin ?? '–'}°` : '–'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 2 }}>
+                  <button onClick={(e) => { e.stopPropagation(); onCopyCity(v.nom); }} title="Copier"
+                    style={{ fontSize: 9, padding: '1px 3px', borderRadius: 3, border: '1px solid #e2e8f0', background: 'white', cursor: 'pointer' }}>📋</button>
+                  {clipboard && clipboard.nom !== v.nom && (
+                    <button onClick={(e) => { e.stopPropagation(); onPasteCity(v.nom); }} title={`Coller depuis ${clipboard.nom}`}
+                      style={{ fontSize: 9, padding: '1px 3px', borderRadius: 3, border: '1px solid #bfdbfe', background: '#eff6ff', cursor: 'pointer' }}>📌</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

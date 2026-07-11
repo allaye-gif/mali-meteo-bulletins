@@ -241,18 +241,19 @@ type VilleRow = Bulletin['donneesVilles'][number];
 
 function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
   return (
-    <div style={{
+    <div className="city-row" style={{
       display: 'grid',
-      gridTemplateColumns: '30% 22% 18% 13% 17%',
+      gridTemplateColumns: '28% 20% 17% 15% 20%',
       alignItems: 'center',
-      padding: '6px 8px',
+      padding: '4px 6px',
       background: zebra ? '#e8f1fb' : '#ffffff',
       borderBottom: '1px solid #cfd8dc',
-      minHeight: 60,
+      minHeight: 56,
       fontFamily: FONT,
+      ...PRINT,
     }}>
       {/* Ville */}
-      <div style={{ fontSize: 12.5, color: '#000', fontWeight: 500, lineHeight: 1.2, wordBreak: 'break-word' }}>{v.nom}</div>
+      <div style={{ fontSize: 12, color: '#000', fontWeight: 500, lineHeight: 1.2, wordBreak: 'break-word' }}>{v.nom}</div>
 
       {/* Weather icon */}
       <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -262,10 +263,10 @@ function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
       {/* Tmax / Tmin */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1 }}>
-          <span style={{ fontSize: 21, fontWeight: 600, color: '#c00000' }}>{v.tmax !== null ? v.tmax : '–'}</span>
-          <span style={{ fontSize: 19, fontWeight: 600, color: '#1f4e9c' }}>{v.tmin !== null ? v.tmin : '–'}</span>
+          <span style={{ fontSize: 19, fontWeight: 700, color: '#c00000' }}>{v.tmax !== null ? v.tmax : '–'}</span>
+          <span style={{ fontSize: 17, fontWeight: 600, color: '#1f4e9c' }}>{v.tmin !== null ? v.tmin : '–'}</span>
         </div>
-        <span style={{ fontSize: 10, color: '#000' }}>°C</span>
+        <span style={{ fontSize: 9, color: '#000' }}>°C</span>
       </div>
 
       {/* Wind arrow */}
@@ -273,10 +274,10 @@ function CityRow({ v, zebra }: { v: VilleRow; zebra: boolean }) {
         <WindArrow dir={v.directionVent} />
       </div>
 
-      {/* Direction + speed */}
-      <div style={{ fontSize: 12.5, color: '#000', lineHeight: 1.35 }}>
-        <div>{v.directionVent ?? '–'}</div>
-        <div>{v.vitesseVent !== null ? `${v.vitesseVent}km/h` : '–'}</div>
+      {/* Direction + speed — explicit overflow guard */}
+      <div style={{ fontSize: 11.5, color: '#000', lineHeight: 1.4, overflowWrap: 'break-word', wordBreak: 'break-all' }}>
+        <div style={{ fontWeight: 600 }}>{v.directionVent ?? '–'}</div>
+        <div style={{ color: '#444' }}>{v.vitesseVent !== null ? `${v.vitesseVent}km/h` : '–'}</div>
       </div>
     </div>
   );

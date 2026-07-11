@@ -125,7 +125,6 @@ export function MiniVigilanceMap({ vigilanceData, width = 260 }: Props) {
             key={name}
             d={featureToPath(feat)}
             fill={fill}
-            fillOpacity={0.85}
             stroke="#ffffff"
             strokeWidth="1.2"
             strokeLinejoin="round"

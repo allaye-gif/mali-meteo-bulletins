@@ -243,14 +243,46 @@ function MapContent(props: Props) {
   );
 }
 
+/* ══════════════════════════════════════════════
+   RESET / CENTER CONTROL
+   ══════════════════════════════════════════════ */
+function ResetControl() {
+  const map = useMap();
+  useEffect(() => {
+    const MyControl = L.Control.extend({
+      options: { position: 'bottomright' as const },
+      onAdd() {
+        const container = L.DomUtil.create('div', 'leaflet-control-zoom leaflet-bar leaflet-control') as HTMLDivElement;
+        const link = L.DomUtil.create('a', '', container) as HTMLAnchorElement;
+        link.innerHTML = '⌖';
+        link.title = 'Recentrer la carte';
+        link.href = '#';
+        link.style.cssText = 'font-size:18px;line-height:30px;display:block;width:30px;height:30px;text-align:center;text-decoration:none;color:#333;';
+        L.DomEvent.on(link, 'click', (e) => {
+          L.DomEvent.stop(e as Event);
+          map.fitBounds([[10.0, -12.5], [25.2, 5.2]], { padding: [10, 10] });
+        });
+        return container;
+      },
+    });
+    const ctrl = new (MyControl as any)();
+    ctrl.addTo(map);
+    return () => { ctrl.remove(); };
+  }, [map]);
+  return null;
+}
+
 export function MaliInteractiveMap(props: Props) {
   return (
     <MapContainer
       center={[17, -3]} zoom={5}
+      scrollWheelZoom={false}
+      keyboard={false}
       zoomControl={true} attributionControl={false}
       style={{ width: '100%', height: '100%', background: '#e8f0f7' }}
     >
       <MapContent {...props} />
+      <ResetControl />
     </MapContainer>
   );
 }
