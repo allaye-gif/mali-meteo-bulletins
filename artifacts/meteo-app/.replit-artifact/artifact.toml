@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "MALI-METEO Bulletins"
+version = "1.0.0"
+id = "artifacts/meteo-app"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22765
+
+[services.development]
+run = "pnpm --filter @workspace/meteo-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/meteo-app", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/meteo-app/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22765"
+BASE_PATH = "/"

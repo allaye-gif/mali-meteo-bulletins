@@ -3,20 +3,23 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: MALI-METEO Bulletins API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: bulletins
+    description: Bulletin météo operations
+  - name: templates
+    description: Modèles de textes
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +27,214 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /bulletins:
+    get:
+      operationId: listBulletins
+      tags: [bulletins]
+      summary: Lister les bulletins
+      parameters:
+        - name: type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [radio, matinal, journaux, ortm, national]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+      responses:
+        "200":
+          description: Liste des bulletins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Bulletin"
+    post:
+      operationId: createBulletin
+      tags: [bulletins]
+      summary: Créer un nouveau bulletin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulletinInput"
+      responses:
+        "201":
+          description: Bulletin créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bulletin"
+        "400":
+          description: Données invalides
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bulletins/stats:
+    get:
+      operationId: getBulletinStats
+      tags: [bulletins]
+      summary: Statistiques des bulletins
+      responses:
+        "200":
+          description: Statistiques
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BulletinStats"
+
+  /bulletins/{id}:
+    get:
+      operationId: getBulletin
+      tags: [bulletins]
+      summary: Récupérer un bulletin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bulletin trouvé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bulletin"
+        "404":
+          description: Bulletin introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateBulletin
+      tags: [bulletins]
+      summary: Mettre à jour un bulletin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulletinInput"
+      responses:
+        "200":
+          description: Bulletin mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bulletin"
+        "404":
+          description: Bulletin introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteBulletin
+      tags: [bulletins]
+      summary: Supprimer un bulletin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Supprimé
+        "404":
+          description: Bulletin introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /bulletins/{id}/duplicate:
+    post:
+      operationId: duplicateBulletin
+      tags: [bulletins]
+      summary: Dupliquer un bulletin (pour créer le suivant)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Bulletin dupliqué
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Bulletin"
+        "404":
+          description: Bulletin introuvable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /templates:
+    get:
+      operationId: listTemplates
+      tags: [templates]
+      summary: Lister les modèles de textes
+      parameters:
+        - name: categorie
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [ciel, vents, visibilite, orages, temperatures]
+      responses:
+        "200":
+          description: Liste des modèles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Template"
+    post:
+      operationId: createTemplate
+      tags: [templates]
+      summary: Créer un modèle personnalisé
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TemplateInput"
+      responses:
+        "201":
+          description: Modèle créé
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +245,198 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SituationGenerale:
+      type: object
+      properties:
+        ciel:
+          type: string
+        vents:
+          type: string
+        visibilite:
+          type: string
+        orages:
+          type: ["string", "null"]
+        temperatures:
+          type: string
+      required:
+        - ciel
+        - vents
+        - visibilite
+        - temperatures
+
+    VilleData:
+      type: object
+      properties:
+        nom:
+          type: string
+        tmax:
+          type: ["integer", "null"]
+        tmin:
+          type: ["integer", "null"]
+        directionVent:
+          type: ["string", "null"]
+        vitesseVent:
+          type: ["integer", "null"]
+        condition:
+          type: ["string", "null"]
+          enum:
+            - ensoleille
+            - nuageux
+            - partiellement_nuageux
+            - pluvieux
+            - orageux
+            - couvert
+            - null
+      required:
+        - nom
+
+    VigilanceData:
+      type: object
+      properties:
+        region:
+          type: string
+        niveau:
+          type: string
+          enum: [vigilance_absolue, tres_vigilants, attentifs, pas_vigilance]
+      required:
+        - region
+        - niveau
+
+    Bulletin:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [radio, matinal, journaux, ortm, national]
+        bulletinDate:
+          type: string
+        periodLabel:
+          type: string
+        validiteLabel:
+          type: string
+        heureLabel:
+          type: ["string", "null"]
+        situationGenerale:
+          $ref: "#/components/schemas/SituationGenerale"
+        donneesVilles:
+          type: array
+          items:
+            $ref: "#/components/schemas/VilleData"
+        vigilanceNiveaux:
+          type: array
+          items:
+            $ref: "#/components/schemas/VigilanceData"
+        createdAt:
+          type: string
+        updatedAt:
+          type: string
+      required:
+        - id
+        - type
+        - bulletinDate
+        - periodLabel
+        - validiteLabel
+        - situationGenerale
+        - donneesVilles
+        - vigilanceNiveaux
+        - createdAt
+        - updatedAt
+
+    BulletinInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [radio, matinal, journaux, ortm, national]
+        bulletinDate:
+          type: string
+        periodLabel:
+          type: string
+        validiteLabel:
+          type: string
+        heureLabel:
+          type: ["string", "null"]
+        situationGenerale:
+          $ref: "#/components/schemas/SituationGenerale"
+        donneesVilles:
+          type: array
+          items:
+            $ref: "#/components/schemas/VilleData"
+        vigilanceNiveaux:
+          type: array
+          items:
+            $ref: "#/components/schemas/VigilanceData"
+      required:
+        - type
+        - bulletinDate
+        - periodLabel
+        - validiteLabel
+        - situationGenerale
+        - donneesVilles
+
+    BulletinStats:
+      type: object
+      properties:
+        total:
+          type: integer
+        parType:
+          type: object
+          additionalProperties:
+            type: integer
+        recents:
+          type: array
+          items:
+            $ref: "#/components/schemas/Bulletin"
+      required:
+        - total
+        - parType
+        - recents
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        categorie:
+          type: string
+          enum: [ciel, vents, visibilite, orages, temperatures]
+        texte:
+          type: string
+        estDefaut:
+          type: boolean
+        createdAt:
+          type: string
+      required:
+        - id
+        - nom
+        - categorie
+        - texte
+        - estDefaut
+        - createdAt
+
+    TemplateInput:
+      type: object
+      properties:
+        nom:
+          type: string
+        categorie:
+          type: string
+          enum: [ciel, vents, visibilite, orages, temperatures]
+        texte:
+          type: string
+      required:
+        - nom
+        - categorie
+        - texte

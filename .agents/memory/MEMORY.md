@@ -1,0 +1,3 @@
+- [Mali map GeoJSON](mali-map-geojson.md) — shapefiles converted manually (no pyshp/mapshaper), admin1=20 regions matching 20 cities exactly.
+- [Leaflet hooks rule](leaflet-hooks-rule.md) — all hooks must be declared before any conditional return inside react-leaflet inner components.
+- [Bulletin preview format](bulletin-preview-format.md) — pixel-perfect colors and fonts for the 5 MALI-METEO bulletin types.
