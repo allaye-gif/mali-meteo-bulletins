@@ -663,14 +663,16 @@ export function EditBulletin() {
         if (!prev) return prev;
         const donneesVilles = prev.donneesVilles.map((v) => {
           const w = weather[v.nom];
-          return w ? { ...v, tmax: w.tmax, tmin: w.tmin } : v;
+          return w
+            ? { ...v, tmax: w.tmax, tmin: w.tmin, directionVent: w.directionVent, vitesseVent: w.vitesseVent }
+            : v;
         });
         const next = { ...prev, donneesVilles };
         pushHistory({ villes: donneesVilles, vigilance: prev.vigilanceNiveaux ?? [] });
         triggerSaveRef.current(next);
         return next;
       });
-      toast({ title: '✓ Températures chargées via Open-Meteo' });
+      toast({ title: '✓ Températures et vents chargés via Open-Meteo' });
     } catch {
       toast({ title: 'Erreur météo', variant: 'destructive' });
     } finally { setWeatherLoading(false); }
