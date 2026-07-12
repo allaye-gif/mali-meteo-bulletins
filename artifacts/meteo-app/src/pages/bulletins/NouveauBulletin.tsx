@@ -8,19 +8,21 @@ import {
   Newspaper,
   Tv,
   Map as MapIcon,
-  ChevronLeft
+  ChevronLeft,
+  Building2,
 } from 'lucide-react';
 import { useCreateBulletin, BulletinInputType } from '@workspace/api-client-react';
-import { format } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { getInitialVilleData, getInitialVigilanceData } from '@/lib/constants';
 
 const types = [
-  { id: 'radio', icon: Radio, title: 'Bulletin Radio', desc: 'Situation générale et températures min/max. Spécialement formaté pour la lecture à l\'antenne.' },
-  { id: 'matinal', icon: Sun, title: 'Bulletin Matinal', desc: 'Situation générale et températures maximales uniquement.' },
-  { id: 'journaux', icon: Newspaper, title: 'Bulletin Journaux', desc: 'Avec carte de vigilance, conditions météo par ville et icônes.' },
-  { id: 'ortm', icon: Tv, title: 'Bulletin ORTM', desc: 'Formaté pour l\'affichage à la télévision avec carte du Mali et données superposées.' },
-  { id: 'national', icon: MapIcon, title: 'Bulletin National', desc: 'Document complet en 2 pages: Situation avec carte + tableau détaillé des températures.' },
+  { id: 'radio',     icon: Radio,     title: 'Bulletin Radio',    desc: 'Situation générale et températures min/max. Formaté pour la lecture à l\'antenne.' },
+  { id: 'matinal',   icon: Sun,       title: 'Bulletin Matinal',  desc: 'Situation générale et températures maximales uniquement.' },
+  { id: 'journaux',  icon: Newspaper, title: 'Bulletin Journaux', desc: 'Avec carte de vigilance, conditions météo par ville et icônes.' },
+  { id: 'ortm',      icon: Tv,        title: 'Bulletin ORTM',     desc: 'Situation générale + carte du Mali avec données superposées pour la télévision.' },
+  { id: 'national',  icon: MapIcon,   title: 'Bulletin National', desc: 'Document complet 2 pages : Situation avec carte + tableau détaillé des températures.' },
+  { id: 'bamako72h', icon: Building2, title: 'Prévisions Bamako 72h', desc: 'Prévisions à 3 jours pour Bamako et environs : températures, météo et vent.' },
 ];
 
 export function NouveauBulletin() {
@@ -33,11 +35,33 @@ export function NouveauBulletin() {
 
   const handleSelectType = async (type: string) => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    const periodLabel = format(new Date(), 'dd MMMM yyyy', { locale: fr });
-    
+    const d0 = new Date();
+
+    let periodLabel = format(d0, 'dd MMMM yyyy', { locale: fr });
+    // ORTM: "07 au 08 juillet 2026" (spans 2 days)
+    if (type === 'ortm') {
+      const d1 = addDays(d0, 1);
+      const day0str = format(d0, 'dd', { locale: fr });
+      const day1str = format(d1, 'dd MMMM yyyy', { locale: fr });
+      periodLabel = `${day0str} au ${day1str}`;
+    }
+
     let validiteLabel = "demain 18h TU";
     if (type === 'matinal') validiteLabel = "aujourd'hui 18h TU";
     if (type === 'radio') validiteLabel = "demain 12h TU";
+    if (type === 'bamako72h') validiteLabel = "";
+
+    // Bamako 72h: 3 days starting tomorrow
+    let donneesVilles;
+    if (type === 'bamako72h') {
+      donneesVilles = [1, 2, 3].map((n) => {
+        const d = addDays(d0, n);
+        const label = format(d, "EEE. dd MMM. yyyy", { locale: fr });
+        return { nom: label, tmax: null as number | null, tmin: null as number | null, condition: null, directionVent: 'SO', vitesseVent: null as number | null };
+      });
+    } else {
+      donneesVilles = getInitialVilleData();
+    }
 
     const payload = {
       type: type as BulletinInputType,
@@ -52,7 +76,7 @@ export function NouveauBulletin() {
         orages: null,
         temperatures: ''
       },
-      donneesVilles: getInitialVilleData(),
+      donneesVilles,
       vigilanceNiveaux: type === 'journaux' ? getInitialVigilanceData() : undefined
     };
 

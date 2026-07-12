@@ -22,7 +22,7 @@ import {
   SelectedEntity, VilleData, VigilanceData, EditMode,
 } from '@/components/map/MaliInteractiveMap';
 import {
-  CITIES, CONDITIONS, VIGILANCE_NIVEAUX, VIGILANCE_TYPES,
+  CITIES, CONDITIONS, VIGILANCE_NIVEAUX, VIGILANCE_TYPES, DIRECTIONS_VENT,
   getInitialVilleData, getInitialVigilanceData,
 } from '@/lib/constants';
 import { fetchMaliWeather } from '@/lib/weather-api';
@@ -37,12 +37,92 @@ const MAX_HISTORY = 40;
 
 /* ─── Bulletin type config ─── */
 const BULLETIN_TYPES = [
-  { value: 'radio',    label: 'Radio',    emoji: '📻' },
-  { value: 'matinal',  label: 'Matinal',  emoji: '🌅' },
-  { value: 'journaux', label: 'Journaux', emoji: '📰' },
-  { value: 'ortm',     label: 'ORTM',     emoji: '📺' },
-  { value: 'national', label: 'National', emoji: '🗺️' },
+  { value: 'radio',     label: 'Radio',     emoji: '📻' },
+  { value: 'matinal',   label: 'Matinal',   emoji: '🌅' },
+  { value: 'journaux',  label: 'Journaux',  emoji: '📰' },
+  { value: 'ortm',      label: 'ORTM',      emoji: '📺' },
+  { value: 'national',  label: 'National',  emoji: '🗺️' },
+  { value: 'bamako72h', label: '72h Bamako',emoji: '🏙️' },
 ];
+
+/* ══════════════════════════════════════════════
+   BAMAKO 72H — 3-day editor
+   ══════════════════════════════════════════════ */
+function Bamako72hDayEditor({
+  days, onUpdate,
+}: {
+  days: VilleData[];
+  onUpdate: (idx: number, field: keyof VilleData, value: unknown) => void;
+}) {
+  const dayArr = days.slice(0, 3);
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>
+        🏙️ Prévisions Bamako — 3 jours
+      </div>
+      {dayArr.map((day, idx) => (
+        <div key={idx} style={{
+          border: '1px solid #cbd5e1', borderRadius: 10, padding: '14px', background: idx % 2 === 0 ? '#f0f9ff' : '#fff',
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          {/* Day label */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#0369a1', minWidth: 60 }}>Jour {idx + 1}</span>
+            <input value={day.nom} onChange={(e) => onUpdate(idx, 'nom', e.target.value)}
+              placeholder="jeu. 10 juil. 2026"
+              style={{ flex: 1, fontSize: 12, border: '1px solid #cbd5e1', borderRadius: 6, padding: '4px 8px' }} />
+          </div>
+          {/* Temperatures */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#1f4e9c', display: 'block', marginBottom: 3 }}>Tmin (°C)</label>
+              <input type="number" value={day.tmin ?? ''} onChange={(e) => onUpdate(idx, 'tmin', e.target.value ? Number(e.target.value) : null)}
+                style={{ width: '100%', fontSize: 13, border: '1px solid #93c5fd', borderRadius: 6, padding: '5px 8px', textAlign: 'center', fontWeight: 700, color: '#1f4e9c' }} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#b91c1c', display: 'block', marginBottom: 3 }}>Tmax (°C)</label>
+              <input type="number" value={day.tmax ?? ''} onChange={(e) => onUpdate(idx, 'tmax', e.target.value ? Number(e.target.value) : null)}
+                style={{ width: '100%', fontSize: 13, border: '1px solid #fca5a5', borderRadius: 6, padding: '5px 8px', textAlign: 'center', fontWeight: 700, color: '#b91c1c' }} />
+            </div>
+          </div>
+          {/* Condition */}
+          <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: '#374151', display: 'block', marginBottom: 3 }}>Condition météo</label>
+            <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {CONDITIONS.map((c) => (
+                <button key={c.value} onClick={() => onUpdate(idx, 'condition', c.value)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 3, padding: '3px 8px', borderRadius: 7, fontSize: 10, cursor: 'pointer',
+                    border: `2px solid ${day.condition === c.value ? '#8b5cf6' : '#e2e8f0'}`,
+                    background: day.condition === c.value ? '#f3e8ff' : 'white',
+                    fontWeight: day.condition === c.value ? 700 : 500,
+                  }}>
+                  {c.icon} {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {/* Wind */}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', display: 'block', marginBottom: 3 }}>Direction vent</label>
+              <select value={day.directionVent ?? ''} onChange={(e) => onUpdate(idx, 'directionVent', e.target.value)}
+                style={{ width: '100%', fontSize: 12, border: '1px solid #bae6fd', borderRadius: 6, padding: '5px 8px' }}>
+                <option value="">–</option>
+                {DIRECTIONS_VENT.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={{ fontSize: 10, fontWeight: 700, color: '#0369a1', display: 'block', marginBottom: 3 }}>Vitesse (km/h)</label>
+              <input type="number" value={day.vitesseVent ?? ''} onChange={(e) => onUpdate(idx, 'vitesseVent', e.target.value ? Number(e.target.value) : null)}
+                style={{ width: '100%', fontSize: 12, border: '1px solid #bae6fd', borderRadius: 6, padding: '5px 8px' }} />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /* ─── Studio tabs ─── */
 type StudioTab = 'carte' | 'vigilance' | 'textes';
@@ -473,16 +553,28 @@ export function EditBulletin() {
   useEffect(() => {
     if (bulletin && initializedRef.current !== id) {
       initializedRef.current = id;
-      const base = getInitialVilleData();
-      const merged = base.map((def) => {
-        const ex = bulletin.donneesVilles?.find((v) => v.nom === def.nom);
-        return ex ? { ...def, ...ex } : def;
-      });
+      let mergedVilles;
+      if (bulletin.type === 'bamako72h') {
+        // 72h bulletin: donneesVilles = 3 days, do NOT merge with the 20-city list
+        mergedVilles = bulletin.donneesVilles?.length
+          ? bulletin.donneesVilles
+          : [
+              { nom: 'Jour 1', tmax: null, tmin: null, condition: null, directionVent: 'SO', vitesseVent: null },
+              { nom: 'Jour 2', tmax: null, tmin: null, condition: null, directionVent: 'SO', vitesseVent: null },
+              { nom: 'Jour 3', tmax: null, tmin: null, condition: null, directionVent: 'SO', vitesseVent: null },
+            ];
+      } else {
+        const base = getInitialVilleData();
+        mergedVilles = base.map((def) => {
+          const ex = bulletin.donneesVilles?.find((v) => v.nom === def.nom);
+          return ex ? { ...def, ...ex } : def;
+        });
+      }
       const vigilance = bulletin.vigilanceNiveaux?.length
         ? bulletin.vigilanceNiveaux : getInitialVigilanceData();
-      const fd = { ...bulletin, donneesVilles: merged, vigilanceNiveaux: vigilance };
+      const fd = { ...bulletin, donneesVilles: mergedVilles, vigilanceNiveaux: vigilance };
       setFormData(fd);
-      history.current = [{ villes: merged, vigilance }];
+      history.current = [{ villes: mergedVilles, vigilance }];
       historyIdx.current = 0;
     }
   }, [bulletin, id]);
@@ -783,6 +875,24 @@ export function EditBulletin() {
         {/* ════ LEFT: Studio tabs ════ */}
         <div className="flex flex-col border-r overflow-hidden" style={{ width: '52%' }}>
 
+          {/* ── BAMAKO 72H: special 3-day editor ── */}
+          {formData.type === 'bamako72h' ? (
+            <Bamako72hDayEditor
+              days={formData.donneesVilles as VilleData[]}
+              onUpdate={(idx, field, value) => {
+                setFormData((prev) => {
+                  if (!prev) return prev;
+                  const donneesVilles = prev.donneesVilles.map((v, i) =>
+                    i === idx ? { ...v, [field]: value } : v
+                  );
+                  const next = { ...prev, donneesVilles };
+                  triggerSaveRef.current(next);
+                  return next;
+                });
+              }}
+            />
+          ) : (
+          <>
           {/* Tab bar + undo/redo */}
           <StudioTabBar
             active={activeTab}
@@ -904,6 +1014,8 @@ export function EditBulletin() {
               previousBulletin={previousBulletin}
               onImportFromPrevious={importFromPrevious}
             />
+          )}
+          </>
           )}
         </div>
 

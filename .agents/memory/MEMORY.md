@@ -1,4 +1,5 @@
 - [Mali map GeoJSON](mali-map-geojson.md) — shapefiles converted manually (no pyshp/mapshaper), admin1=20 regions matching 20 cities exactly.
 - [Studio Météo UI](studio-meteo-ui.md) — 4-mode paint interface (temp/condition/vent/vigilance), compass rose, undo/redo, copy-paste.
 - [Leaflet hooks rule](leaflet-hooks-rule.md) — all hooks must be declared before any conditional return inside react-leaflet inner components.
-- [Bulletin preview format](bulletin-preview-format.md) — pixel-perfect colors and fonts for the 5 MALI-METEO bulletin types.
+- [Bulletin preview format](bulletin-preview-format.md) — pixel-perfect colors and fonts for the 6 MALI-METEO bulletin types (includes bamako72h).
+- [api-zod rebuild rule](api-zod-rebuild.md) — adding enum values to api-zod requires: (1) edit src/generated/api.ts + types/bulletinInputType.ts, (2) run `cd lib/api-zod && pnpm tsc -p tsconfig.json`, (3) restart api-server workflow.

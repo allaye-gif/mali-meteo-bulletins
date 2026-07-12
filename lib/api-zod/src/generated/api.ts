@@ -23,14 +23,14 @@ export const listBulletinsQueryLimitDefault = 50;
 export const listBulletinsQueryOffsetDefault = 0;
 
 export const ListBulletinsQueryParams = zod.object({
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']).optional(),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']).optional(),
   "limit": zod.coerce.number().default(listBulletinsQueryLimitDefault),
   "offset": zod.coerce.number().default(listBulletinsQueryOffsetDefault)
 })
 
 export const ListBulletinsResponseItem = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -64,7 +64,7 @@ export const ListBulletinsResponse = zod.array(ListBulletinsResponseItem)
  * @summary Créer un nouveau bulletin
  */
 export const CreateBulletinBody = zod.object({
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -92,7 +92,7 @@ export const CreateBulletinBody = zod.object({
 
 export const CreateBulletinResponse = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -129,7 +129,7 @@ export const GetBulletinStatsResponse = zod.object({
   "parType": zod.record(zod.string(), zod.number()),
   "recents": zod.array(zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -168,7 +168,7 @@ export const GetBulletinParams = zod.object({
 
 export const GetBulletinResponse = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -205,7 +205,7 @@ export const UpdateBulletinParams = zod.object({
 })
 
 export const UpdateBulletinBody = zod.object({
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -233,7 +233,7 @@ export const UpdateBulletinBody = zod.object({
 
 export const UpdateBulletinResponse = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),
@@ -281,7 +281,7 @@ export const DuplicateBulletinParams = zod.object({
 
 export const DuplicateBulletinResponse = zod.object({
   "id": zod.number(),
-  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national']),
+  "type": zod.enum(['radio', 'matinal', 'journaux', 'ortm', 'national', 'bamako72h']),
   "bulletinDate": zod.string(),
   "periodLabel": zod.string(),
   "validiteLabel": zod.string(),

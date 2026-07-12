@@ -15,4 +15,5 @@ export const BulletinInputType = {
   journaux: 'journaux',
   ortm: 'ortm',
   national: 'national',
+  bamako72h: 'bamako72h',
 } as const;

@@ -11,7 +11,8 @@ import {
   Newspaper,
   Tv,
   Map as MapIcon,
-  CloudSun
+  CloudSun,
+  Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -36,11 +37,12 @@ export function Sidebar({ className }: SidebarProps) {
   ];
 
   const types = [
-    { icon: Radio, label: 'Radio', type: 'radio' },
-    { icon: Sun, label: 'Matinal', type: 'matinal' },
-    { icon: Newspaper, label: 'Journaux', type: 'journaux' },
-    { icon: Tv, label: 'ORTM', type: 'ortm' },
-    { icon: MapIcon, label: 'National', type: 'national' },
+    { icon: Radio,     label: 'Radio',         type: 'radio' },
+    { icon: Sun,       label: 'Matinal',        type: 'matinal' },
+    { icon: Newspaper, label: 'Journaux',       type: 'journaux' },
+    { icon: Tv,        label: 'ORTM',           type: 'ortm' },
+    { icon: MapIcon,   label: 'National',       type: 'national' },
+    { icon: Building2, label: 'Bamako 72h',     type: 'bamako72h' },
   ];
 
   return (

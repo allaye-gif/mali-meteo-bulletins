@@ -82,9 +82,13 @@ const CITY_NUDGE: Record<string, { dx: number; dy: number }> = {
 };
 
 /* ── Component ───────────────────────────────────────────────────────────── */
-interface Props { data: Bulletin; }
+interface Props {
+  data: Bulletin;
+  /** Show per-city wind arrows. Default true (National). ORTM = false. */
+  showWindArrows?: boolean;
+}
 
-export function WeatherMapSvg({ data }: Props) {
+export function WeatherMapSvg({ data, showWindArrows = true }: Props) {
   const [geojson, setGeojson] = React.useState<GeoCollection | null>(null);
 
   React.useEffect(() => {
@@ -178,15 +182,20 @@ export function WeatherMapSvg({ data }: Props) {
           <div style={{ color: '#1f4e9c' }}>température minimale</div>
         </div>
 
-        {/* ── Compass rose (top-right) ── */}
+        {/* ── Compass rose (top-right) — N, O, E, S ── */}
         <div style={{ position: 'absolute', top: '2%', right: '2%', zIndex: 10, ...PRINT }}>
-          <svg width="38" height="38" viewBox="0 0 38 38" aria-label="Rose des vents">
-            <line x1="19" y1="3" x2="19" y2="35" stroke="#333" strokeWidth="0.8" />
-            <line x1="3" y1="19" x2="35" y2="19" stroke="#333" strokeWidth="0.8" />
-            {/* N arrow */}
-            <polygon points="19,1 22,11 19,9 16,11" fill="#333" />
-            <text x="19" y="21" textAnchor="middle" dominantBaseline="middle"
-              fontSize="8" fontWeight="bold" fontFamily="Arial" fill="#333">N</text>
+          <svg width="48" height="48" viewBox="0 0 48 48" aria-label="Rose des vents">
+            {/* Cross lines */}
+            <line x1="24" y1="5" x2="24" y2="43" stroke="#333" strokeWidth="0.7" />
+            <line x1="5" y1="24" x2="43" y2="24" stroke="#333" strokeWidth="0.7" />
+            {/* N arrow (filled north, hollow south) */}
+            <polygon points="24,2 27,13 24,11 21,13" fill="#222" />
+            <polygon points="24,46 27,35 24,37 21,35" fill="none" stroke="#555" strokeWidth="0.6" />
+            {/* Cardinal labels */}
+            <text x="24" y="19" textAnchor="middle" fontSize="8" fontWeight="bold" fontFamily="Arial" fill="#111">N</text>
+            <text x="24" y="34" textAnchor="middle" fontSize="7" fontFamily="Arial" fill="#444">S</text>
+            <text x="38" y="26.5" textAnchor="middle" fontSize="7" fontFamily="Arial" fill="#444">E</text>
+            <text x="10" y="26.5" textAnchor="middle" fontSize="7" fontFamily="Arial" fill="#444">O</text>
           </svg>
         </div>
 
@@ -220,8 +229,8 @@ export function WeatherMapSvg({ data }: Props) {
                 ...PRINT,
               }}
             >
-              {/* Wind arrow */}
-              {v.directionVent && (
+              {/* Wind arrow (National only) */}
+              {showWindArrows && v.directionVent && (
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <svg width="10" height="10" viewBox="0 0 10 10"
                     style={{ transform: `rotate(${windRot}deg)` }} aria-hidden>

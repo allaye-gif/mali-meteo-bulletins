@@ -3,6 +3,7 @@ import { Bulletin } from '@workspace/api-client-react';
 import { CONDITIONS, VIGILANCE_NIVEAUX } from '@/lib/constants';
 import { MiniVigilanceMap } from './MiniVigilanceMap';
 import { WeatherMapSvg } from './WeatherMapSvg';
+import { Bamako72hPreview } from './Bamako72hPreview';
 
 /* ══════════════════════════════════════════════════════════
    DESIGN TOKENS — from official MALI-METEO bulletin format
@@ -95,11 +96,12 @@ function Header({ data }: { data: Bulletin }) {
   const base = import.meta.env.BASE_URL;
 
   const labels: Record<string, string> = {
-    radio:    `Bulletin radio du ${data.periodLabel}${data.heureLabel ? ` A ${data.heureLabel}` : ''}`,
-    matinal:  `Bulletin matinal du ${data.periodLabel}`,
-    journaux: `Bulletin météorologique du ${data.periodLabel}`,
-    ortm:     `Bulletin météo ORTM du ${data.periodLabel}`,
-    national: `Bulletin météo national du ${data.periodLabel}`,
+    radio:      `Bulletin radio du ${data.periodLabel}${data.heureLabel ? ` A ${data.heureLabel}` : ''}`,
+    matinal:    `Bulletin matinal du ${data.periodLabel}`,
+    journaux:   `Bulletin météorologique du ${data.periodLabel}`,
+    ortm:       `Bulletin météorologique du ${data.periodLabel}`,
+    national:   `Bulletin météo national du ${data.periodLabel}`,
+    bamako72h:  `Bulletin météorologique du ${data.periodLabel}`,
   };
   const leftText = labels[data.type] ?? `Bulletin du ${data.periodLabel}`;
   const validite = data.validiteLabel;
@@ -144,10 +146,22 @@ function Footer() {
 }
 
 /* ══════════════════════════════════════════════════════════
+   BOLD MARKDOWN RENDERER — renders **text** → <strong>
+   ══════════════════════════════════════════════════════════ */
+function renderWithBold(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : part
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    SITUATION GÉNÉRALE
    ══════════════════════════════════════════════════════════ */
 function SituationGenerale({ s, italic = false }: { s: Bulletin['situationGenerale']; italic?: boolean }) {
-  const items = [s.ciel, s.vents, s.visibilite, s.orages, s.temperatures].filter(Boolean);
+  const items = [s.ciel, s.vents, s.visibilite, s.orages, s.temperatures].filter(Boolean) as string[];
   return (
     <div>
       <h2 style={{ color: BLUE, fontSize: 22, fontWeight: 700, margin: '0 0 10px 0', fontFamily: FONT }}>
@@ -160,7 +174,9 @@ function SituationGenerale({ s, italic = false }: { s: Bulletin['situationGenera
       }}>
         <p style={{ fontWeight: 700, fontStyle: 'normal', marginBottom: 8 }}>Le temps sera marqué par :</p>
         {items.map((item, i) => (
-          <p key={i} style={{ marginBottom: i < items.length - 1 ? 8 : 0 }}>•&nbsp;{item}</p>
+          <p key={i} style={{ marginBottom: i < items.length - 1 ? 8 : 0 }}>
+            •&nbsp;{renderWithBold(item)}
+          </p>
         ))}
       </div>
     </div>
@@ -422,6 +438,10 @@ function PageBreak() {
    MAIN EXPORT
    ══════════════════════════════════════════════════════════ */
 export function BulletinPreview({ data }: Props) {
+  // Bamako 72h is a completely different layout — delegate to its own component
+  if (data.type === 'bamako72h') {
+    return <Bamako72hPreview data={data} />;
+  }
   const base = import.meta.env.BASE_URL;
 
   return (
@@ -456,9 +476,14 @@ export function BulletinPreview({ data }: Props) {
       {/* ── Journaux: 2-col SG+map + city grid ── */}
       {data.type === 'journaux' && <JournauxBulletin data={data} />}
 
-      {/* ── ORTM: SVG map only ── */}
+      {/* ── ORTM: SG + SVG map (no wind arrows per city) ── */}
       {data.type === 'ortm' && (
-        <WeatherMapSvg data={data} />
+        <>
+          <div style={{ padding: '20px 28px 0', fontFamily: FONT }}>
+            <SituationGenerale s={data.situationGenerale} />
+          </div>
+          <WeatherMapSvg data={data} showWindArrows={false} />
+        </>
       )}
 
       {/* ── National: SG + SVG map p1 → footer → break → p2 tables ── */}
