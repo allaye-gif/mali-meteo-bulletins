@@ -75,11 +75,11 @@ export function printBulletin(): void {
 <body>
 ${clone.outerHTML}
 <script>
-  // Wait for images to load before printing
+  // Wait for images + SVG GeoJSON rendering (up to 2s) before printing
   window.addEventListener('load', function() {
     setTimeout(function() {
       window.print();
-    }, 300);
+    }, 1500);
   });
 </script>
 </body>

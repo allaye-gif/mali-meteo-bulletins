@@ -2,6 +2,7 @@ import React from 'react';
 import { Bulletin } from '@workspace/api-client-react';
 import { CONDITIONS, VIGILANCE_NIVEAUX } from '@/lib/constants';
 import { MiniVigilanceMap } from './MiniVigilanceMap';
+import { WeatherMapSvg } from './WeatherMapSvg';
 
 /* ══════════════════════════════════════════════════════════
    DESIGN TOKENS — from official MALI-METEO bulletin format
@@ -369,66 +370,7 @@ function JournauxBulletin({ data }: { data: Bulletin }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════════
-   ORTM / NATIONAL — map with city overlay labels
-   ══════════════════════════════════════════════════════════ */
-const CITY_POS: Record<string, { top: string; left: string }> = {
-  'Kayes':      { top: '65%', left: '12%' },
-  'Koulikoro':  { top: '73%', left: '27%' },
-  'Sikasso':    { top: '87%', left: '31%' },
-  'Ségou':      { top: '70%', left: '38%' },
-  'Mopti':      { top: '63%', left: '47%' },
-  'Tombouctou': { top: '39%', left: '43%' },
-  'Gao':        { top: '44%', left: '67%' },
-  'Ménaka':     { top: '51%', left: '82%' },
-  'Kidal':      { top: '27%', left: '77%' },
-  'Taoudéni':   { top: '11%', left: '37%' },
-  'Bougouni':   { top: '85%', left: '29%' },
-  'Koutiala':   { top: '80%', left: '38%' },
-  'Dioïla':     { top: '75%', left: '32%' },
-  'Nioro':      { top: '57%', left: '17%' },
-  'Nara':       { top: '59%', left: '30%' },
-  'Kita':       { top: '72%', left: '18%' },
-  'San':        { top: '69%', left: '44%' },
-  'Douentza':   { top: '56%', left: '54%' },
-  'Bandiagara': { top: '62%', left: '47%' },
-  'Bamako':     { top: '76%', left: '24%' },
-};
-
-function MapOverlay({ data, mapSrc }: { data: Bulletin; mapSrc: string }) {
-  return (
-    <div style={{ padding: '4px 28px 16px', fontFamily: FONT }}>
-      <div style={{ position: 'relative', width: '85%', margin: '0 auto', aspectRatio: '4 / 3' }}>
-        <img
-          src={mapSrc} alt="Carte du Mali"
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-          onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-        />
-        {data.donneesVilles.map((v) => {
-          const pos = CITY_POS[v.nom];
-          if (!pos) return null;
-          const cond = CONDITIONS.find((c) => c.value === v.condition);
-          return (
-            <div key={v.nom} style={{
-              position: 'absolute', top: pos.top, left: pos.left,
-              transform: 'translate(-50%, -50%)',
-              background: 'rgba(255,255,255,0.93)',
-              border: '1px solid #999', borderRadius: 3,
-              padding: '1px 5px', fontSize: 8.5, textAlign: 'center',
-              lineHeight: 1.35, minWidth: 34,
-              boxShadow: '0 1px 4px rgba(0,0,0,0.22)',
-            }}>
-              <div style={{ fontWeight: 700, fontSize: 8 }}>{v.nom}</div>
-              {cond && <div style={{ fontSize: 10 }}>{cond.icon}</div>}
-              <div style={{ color: '#c00000', fontWeight: 700 }}>{v.tmax !== null ? `${v.tmax}°` : '–'}</div>
-              <div style={{ color: '#1f4e9c', fontWeight: 700 }}>{v.tmin !== null ? `${v.tmin}°` : '–'}</div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
+/* MapOverlay removed — replaced by WeatherMapSvg (SVG from GeoJSON + lat/lng positioning) */
 
 /* ══════════════════════════════════════════════════════════
    PAGE BREAK
@@ -480,18 +422,18 @@ export function BulletinPreview({ data }: Props) {
       {/* ── Journaux: 2-col SG+map + city grid ── */}
       {data.type === 'journaux' && <JournauxBulletin data={data} />}
 
-      {/* ── ORTM: map overlay only ── */}
+      {/* ── ORTM: SVG map only ── */}
       {data.type === 'ortm' && (
-        <MapOverlay data={data} mapSrc={`${base}assets/mali-map-ortm.png`} />
+        <WeatherMapSvg data={data} />
       )}
 
-      {/* ── National: SG + map p1 → footer → break → p2 tables ── */}
+      {/* ── National: SG + SVG map p1 → footer → break → p2 tables ── */}
       {data.type === 'national' && (
         <>
           <div style={{ padding: '20px 28px 0', fontFamily: FONT }}>
             <SituationGenerale s={data.situationGenerale} />
           </div>
-          <MapOverlay data={data} mapSrc={`${base}assets/mali-map-national.png`} />
+          <WeatherMapSvg data={data} />
           <Footer />
           <PageBreak />
           <Header data={data} />
