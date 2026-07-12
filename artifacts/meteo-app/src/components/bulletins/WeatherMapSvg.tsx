@@ -60,6 +60,27 @@ const DIR_ROT: Record<string, number> = {
   N: 180, NE: 225, E: 270, SE: 315, S: 0, SO: 45, O: 90, NO: 135,
 };
 
+/**
+ * Manual % nudges for dense southern cities where computed lat/lng positions
+ * cause label overlap. Values are added to the projected left/top %.
+ * Tuned so each label has at least ~5% clearance from its neighbours.
+ */
+const CITY_NUDGE: Record<string, { dx: number; dy: number }> = {
+  // Bamako/Koulikoro/Dioïla cluster (all within ~8% horizontal, ~5% vertical)
+  'Bamako':     { dx: -4,  dy:  2 },  // nudge left + slightly down
+  'Koulikoro':  { dx:  6,  dy: -5 },  // nudge right + up (above Bamako)
+  'Dioïla':     { dx:  7,  dy:  3 },  // nudge right + slightly down
+  'Kita':       { dx: -3,  dy:  1 },  // minor left to clear Bamako left side
+  'Bougouni':   { dx: -4,  dy:  1 },  // pull left so it's under Kita not Bamako
+  // Mopti/Bandiagara cluster (3.6% apart horizontally)
+  'Mopti':      { dx: -5,  dy: -1 },  // nudge left
+  'Bandiagara': { dx:  4,  dy:  3 },  // nudge right + down
+  // Douentza/Bandiagara separation (also close)
+  'Douentza':   { dx:  3,  dy: -2 },  // nudge right + up
+  // Koutiala sits close to Dioïla after its nudge
+  'Koutiala':   { dx:  5,  dy: -1 },  // nudge right
+};
+
 /* ── Component ───────────────────────────────────────────────────────────── */
 interface Props { data: Bulletin; }
 
@@ -174,6 +195,9 @@ export function WeatherMapSvg({ data }: Props) {
           const v = villeMap[city.name];
           if (!v) return null;
           const { left, top } = cityToPct(city.lng, city.lat);
+          const nudge = CITY_NUDGE[city.name] ?? { dx: 0, dy: 0 };
+          const finalLeft = nudge.dx ? `calc(${left} + ${nudge.dx}%)` : left;
+          const finalTop  = nudge.dy ? `calc(${top}  + ${nudge.dy}%)` : top;
           const condIcon = CONDITIONS.find(c => c.value === v.condition)?.icon ?? '';
           const windRot = DIR_ROT[v.directionVent ?? 'S'] ?? 0;
 
@@ -182,7 +206,7 @@ export function WeatherMapSvg({ data }: Props) {
               key={city.id}
               style={{
                 position: 'absolute',
-                left, top,
+                left: finalLeft, top: finalTop,
                 transform: 'translate(-50%, -50%)',
                 background: 'rgba(255,255,255,0.95)',
                 border: '1px solid #999',

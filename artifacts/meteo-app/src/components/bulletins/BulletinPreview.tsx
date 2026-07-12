@@ -172,9 +172,33 @@ function SituationGenerale({ s, italic = false }: { s: Bulletin['situationGenera
    ══════════════════════════════════════════════════════════ */
 type CellData = { nom: string; tmax: number | null; tmin: number | null };
 
-function TempTable({ data, showTmin }: { data: CellData[]; showTmin: boolean }) {
+/** Interpolate between two hex colors; t ∈ [0,1] (0 = low/cool, 1 = high/hot) */
+function lerpHex(t: number, low: string, high: string): string {
+  const rd = (s: string, i: number) => parseInt(s.slice(i, i + 2), 16);
+  const lp = (a: number, b: number) => Math.round(a + (b - a) * Math.max(0, Math.min(1, t)));
+  return '#' + [1, 3, 5].map(i => lp(rd(low, i), rd(high, i)).toString(16).padStart(2, '0')).join('');
+}
+
+interface TempTableProps {
+  data: CellData[];
+  showTmin: boolean;
+  tmaxRange: [number, number]; // [min, max] across ALL 20 cities
+  tminRange: [number, number];
+}
+
+function TempTable({ data, showTmin, tmaxRange, tminRange }: TempTableProps) {
   const totalCols = 1 + data.length;
   const colPct = 100 / 7;
+
+  const tmaxBg = (val: number | null) => {
+    if (val === null || tmaxRange[0] === tmaxRange[1]) return CELL_TMAX;
+    return lerpHex((val - tmaxRange[0]) / (tmaxRange[1] - tmaxRange[0]), '#f5e0c0', '#b05010');
+  };
+  const tminBg = (val: number | null) => {
+    if (val === null || tminRange[0] === tminRange[1]) return CELL_TMIN;
+    return lerpHex((val - tminRange[0]) / (tminRange[1] - tminRange[0]), '#dce6f1', '#5a88c8');
+  };
+
   return (
     <table style={{
       width: `${(totalCols / 7) * 100}%`, tableLayout: 'fixed',
@@ -196,7 +220,7 @@ function TempTable({ data, showTmin }: { data: CellData[]; showTmin: boolean }) 
         <tr>
           <td style={{ background: CELL_TMAX, border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>Tmax (°C)</td>
           {data.map((c, i) => (
-            <td key={i} style={{ background: CELL_TMAX, border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>
+            <td key={i} style={{ background: tmaxBg(c.tmax), border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>
               {c.tmax !== null ? c.tmax : '–'}
             </td>
           ))}
@@ -205,7 +229,7 @@ function TempTable({ data, showTmin }: { data: CellData[]; showTmin: boolean }) 
           <tr>
             <td style={{ background: CELL_TMIN, border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>Tmin (°C)</td>
             {data.map((c, i) => (
-              <td key={i} style={{ background: CELL_TMIN, border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>
+              <td key={i} style={{ background: tminBg(c.tmin), border: CELL_BORDER, textAlign: 'center', padding: '10px 6px', ...PRINT }}>
                 {c.tmin !== null ? c.tmin : '–'}
               </td>
             ))}
@@ -219,6 +243,14 @@ function TempTable({ data, showTmin }: { data: CellData[]; showTmin: boolean }) 
 function TempSection({ villes, showTmin, title }: {
   villes: Bulletin['donneesVilles']; showTmin: boolean; title?: string;
 }) {
+  // Compute global Tmax/Tmin range across ALL cities for consistent gradient
+  const allTmax = villes.map(v => v.tmax).filter((v): v is number => v !== null);
+  const allTmin = villes.map(v => v.tmin).filter((v): v is number => v !== null);
+  const tmaxRange: [number, number] = allTmax.length
+    ? [Math.min(...allTmax), Math.max(...allTmax)] : [0, 50];
+  const tminRange: [number, number] = allTmin.length
+    ? [Math.min(...allTmin), Math.max(...allTmin)] : [0, 35];
+
   const groups: CellData[][] = [];
   for (let i = 0; i < villes.length; i += 6) {
     groups.push(villes.slice(i, i + 6).map((v) => ({ nom: v.nom, tmax: v.tmax, tmin: v.tmin })));
@@ -230,7 +262,9 @@ function TempSection({ villes, showTmin, title }: {
           ? 'Prévision des températures maximales et minimales de la journée'
           : 'Prévision des températures maximales de la journée')}
       </h2>
-      {groups.map((group, i) => <TempTable key={i} data={group} showTmin={showTmin} />)}
+      {groups.map((group, i) => (
+        <TempTable key={i} data={group} showTmin={showTmin} tmaxRange={tmaxRange} tminRange={tminRange} />
+      ))}
     </div>
   );
 }
