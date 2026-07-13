@@ -58,8 +58,8 @@ echo [4] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
 REM === 5. Creation base ===
-echo [5] Creation base meteo_mali :
-"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE template0" 2>&1
+echo [5] Creation base mali_meteo_bul :
+"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE mali_meteo_bul ENCODING 'UTF8' TEMPLATE template0" 2>&1
 echo [5] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
@@ -126,8 +126,8 @@ echo.
 
 REM === 12. Import DB ===
 echo [12] Import base de donnees :
-"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -c "DROP TABLE IF EXISTS bulletins, templates CASCADE" 2>&1
-"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -f "%ROOT%deploy\database_dump.sql" 2>&1
+"%PSQL%" -U postgres -h localhost -p 5432 -d mali_meteo_bul -c "DROP TABLE IF EXISTS bulletins, templates CASCADE" 2>&1
+"%PSQL%" -U postgres -h localhost -p 5432 -d mali_meteo_bul -f "%ROOT%deploy\database_dump.sql" 2>&1
 echo [12] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
@@ -139,7 +139,7 @@ set "PORT=1005"
 set "NODE_ENV=production"
 set "BASE_PATH=/"
 set "STATIC_PATH=%ROOT%artifacts\meteo-app\dist\public"
-set "DATABASE_URL=postgresql://postgres:allaye@localhost:5432/meteo_mali?sslmode=disable"
+set "DATABASE_URL=postgresql://postgres:allaye@localhost:5432/mali_meteo_bul?sslmode=disable"
 set "SESSION_SECRET=meteo-mali-anam-secret"
 set "LOG_LEVEL=info"
 
