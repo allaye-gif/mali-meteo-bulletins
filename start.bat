@@ -102,7 +102,7 @@ echo [OK] Base meteo_mali
 if not exist ".env" (
     (
         echo DATABASE_URL=postgresql://postgres:allaye@localhost:5432/meteo_mali
-        echo PORT=3000
+        echo PORT=1005
         echo NODE_ENV=production
         echo SESSION_SECRET=meteo-mali-anam-secret
         echo LOG_LEVEL=info
