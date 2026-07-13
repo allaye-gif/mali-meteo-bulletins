@@ -42,7 +42,7 @@ if errorlevel 1 (
     echo [INSTALL] Installation de pnpm...
     call npm install -g pnpm >nul 2>&1
 )
-for /f "tokens=*" %%v in ('pnpm --version 2^>nul') do echo [OK] pnpm %%v
+for /f "tokens=*" %%v in ('call pnpm --version 2^>nul') do echo [OK] pnpm %%v
 
 REM Localiser psql (PostgreSQL 14 a 18)
 set "PSQL="
@@ -309,5 +309,5 @@ goto restart
 :fin
 echo.
 echo Appuyez sur une touche pour fermer...
-pause >nul
+cmd /k echo Tape EXIT pour fermer.
 endlocal

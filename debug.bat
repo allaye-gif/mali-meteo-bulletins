@@ -8,7 +8,7 @@ set "LOG=%ROOT%debug_log.txt"
 del "%LOG%" >nul 2>&1
 
 echo ============================================================
-echo  MALI-METEO DEBUG - resultat aussi dans debug_log.txt
+echo  MALI-METEO DEBUG
 echo ============================================================
 echo.
 
@@ -19,11 +19,11 @@ echo [1] Node.js : >> "%LOG%"
 node --version >> "%LOG%" 2>&1
 echo.
 
-REM === 2. pnpm ===
+REM === 2. pnpm  (CALL obligatoire - pnpm.cmd est un batch) ===
 echo [2] pnpm :
-pnpm --version 2>&1
+call pnpm --version 2>&1
 echo [2] pnpm : >> "%LOG%"
-pnpm --version >> "%LOG%" 2>&1
+call pnpm --version >> "%LOG%" 2>&1
 echo.
 
 REM === 3. psql ===
@@ -53,24 +53,23 @@ REM === 4. Connexion PostgreSQL ===
 set "PGPASSWORD=allaye"
 echo [4] Test connexion PostgreSQL :
 "%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()" 2>&1
-echo [4] code retour connexion : %ERRORLEVEL% >> "%LOG%"
+echo [4] code retour: %ERRORLEVEL% >> "%LOG%"
 "%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()" >> "%LOG%" 2>&1
 echo.
 
 REM === 5. Creation base ===
 echo [5] Creation base meteo_mali :
 "%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE template0" 2>&1
-echo [5] code retour CREATE DB : %ERRORLEVEL% >> "%LOG%"
-"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE template0" >> "%LOG%" 2>&1
+echo [5] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
 REM === 6. Frontend ===
 echo [6] Frontend :
 if exist "%ROOT%artifacts\meteo-app\dist\public\index.html" (
-    echo    OK - index.html present
+    echo    OK
     echo [6] frontend : OK >> "%LOG%"
 ) else (
-    echo    ABSENT - %ROOT%artifacts\meteo-app\dist\public\index.html
+    echo    ABSENT : %ROOT%artifacts\meteo-app\dist\public\index.html
     echo [6] frontend : ABSENT >> "%LOG%"
 )
 echo.
@@ -78,7 +77,7 @@ echo.
 REM === 7. database_dump.sql ===
 echo [7] deploy\database_dump.sql :
 if exist "%ROOT%deploy\database_dump.sql" (
-    echo    OK - fichier present
+    echo    OK
     echo [7] dump : OK >> "%LOG%"
 ) else (
     echo    ABSENT
@@ -87,11 +86,11 @@ if exist "%ROOT%deploy\database_dump.sql" (
 echo.
 
 REM === 8. Modules Linux ===
-echo [8] Modules natifs Linux dans node_modules :
-set "LINUX_MOD=Aucun detecte (OK)"
+echo [8] Modules natifs Linux :
+set "LINUX_MOD=Aucun (OK)"
 if exist "%ROOT%node_modules\.pnpm" (
-    for /d %%D in ("%ROOT%node_modules\.pnpm\@rollup+rollup-linux*") do set "LINUX_MOD=OUI %%D"
-    for /d %%D in ("%ROOT%node_modules\.pnpm\@esbuild+linux*") do set "LINUX_MOD=OUI %%D"
+    for /d %%D in ("%ROOT%node_modules\.pnpm\@rollup+rollup-linux*") do set "LINUX_MOD=OUI - %%D"
+    for /d %%D in ("%ROOT%node_modules\.pnpm\@esbuild+linux*") do set "LINUX_MOD=OUI - %%D"
 )
 echo    %LINUX_MOD%
 echo [8] modules linux : %LINUX_MOD% >> "%LOG%"
@@ -100,22 +99,22 @@ echo.
 REM === 9. pnpm install ===
 echo [9] pnpm install :
 cd /d "%ROOT%"
-pnpm install --frozen-lockfile=false 2>&1
-echo [9] code retour pnpm install : %ERRORLEVEL% >> "%LOG%"
+call pnpm install --frozen-lockfile=false 2>&1
+echo [9] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
 REM === 10. Build API ===
 echo [10] Build serveur API :
 cd /d "%ROOT%artifacts\api-server"
 node build.mjs 2>&1
-echo [10] code retour build : %ERRORLEVEL% >> "%LOG%"
+echo [10] code retour build: %ERRORLEVEL% >> "%LOG%"
 cd /d "%ROOT%"
 echo.
 
 REM === 11. dist/index.mjs ===
 echo [11] artifacts\api-server\dist\index.mjs :
 if exist "%ROOT%artifacts\api-server\dist\index.mjs" (
-    echo    OK - fichier present
+    echo    OK
     echo [11] dist : OK >> "%LOG%"
 ) else (
     echo    ABSENT - build a echoue
@@ -127,12 +126,12 @@ REM === 12. Import DB ===
 echo [12] Import base de donnees :
 "%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -c "DROP TABLE IF EXISTS bulletins, templates CASCADE" 2>&1
 "%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -f "%ROOT%deploy\database_dump.sql" 2>&1
-echo [12] code retour import : %ERRORLEVEL% >> "%LOG%"
+echo [12] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 
-REM === 13. Lancement node ===
+REM === 13. Lancement serveur ===
 echo [13] Lancement serveur (PORT=1005) :
-echo      Ctrl+C pour arreter
+echo      (Ctrl+C pour arreter)
 echo.
 set "PORT=1005"
 set "NODE_ENV=production"
@@ -145,13 +144,9 @@ set "LOG_LEVEL=info"
 node "%ROOT%artifacts\api-server\dist\index.mjs" 2>&1
 echo.
 echo [NODE ARRETE - code: %ERRORLEVEL%]
-echo [NODE ARRETE - code: %ERRORLEVEL%] >> "%LOG%"
+echo [NODE ARRETE] >> "%LOG%"
 
 echo.
-echo ============================================================
-echo  Rapport complet enregistre dans : %LOG%
-echo  Copiez le contenu de ce fichier pour le diagnostic.
-echo ============================================================
+echo Rapport enregistre dans : %LOG%
 echo.
-
 cmd /k echo Tape EXIT pour fermer.
