@@ -99,7 +99,9 @@ echo.
 REM === 9. pnpm install ===
 echo [9] pnpm install :
 cd /d "%ROOT%"
-call pnpm install --frozen-lockfile=false 2>&1
+REM Supprimer le lockfile Linux (contient @esbuild/linux-x64 pas win32-x64)
+del pnpm-lock.yaml >nul 2>&1
+call pnpm install --frozen-lockfile=false --ignore-scripts 2>&1
 echo [9] code retour: %ERRORLEVEL% >> "%LOG%"
 echo.
 

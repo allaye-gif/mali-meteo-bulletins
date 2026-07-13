@@ -178,7 +178,7 @@ if "!NEED_CLEAN!"=="1" (
 
 if not exist "node_modules" (
     echo [INSTALL] Installation des dependances (premiere fois, patientez)...
-    call pnpm install --frozen-lockfile=false
+    call pnpm install --frozen-lockfile=false --ignore-scripts
     if errorlevel 1 (
         echo [ERREUR] pnpm install a echoue.
         goto fin
