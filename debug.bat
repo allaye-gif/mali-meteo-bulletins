@@ -107,10 +107,8 @@ echo.
 
 REM === 10. Build API ===
 echo [10] Build serveur API :
-cd /d "%ROOT%artifacts\api-server"
-node build.mjs 2>&1
-echo [10] code retour build: %ERRORLEVEL% >> "%LOG%"
-cd /d "%ROOT%"
+echo    SKIP - dist/ pre-compile depuis Replit (git pull pour mettre a jour)
+echo [10] dist pre-compile, pas de build Windows >> "%LOG%"
 echo.
 
 REM === 11. dist/index.mjs ===

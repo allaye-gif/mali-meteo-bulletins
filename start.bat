@@ -187,19 +187,14 @@ if not exist "node_modules" (
 echo [OK] Dependances installees
 
 REM ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REM 7. BUILD DU SERVEUR API (esbuild uniquement, pas Vite)
-REM Le frontend dist/ est deja commite depuis Replit.
+REM 7. VERIFICATION dist/ API (pre-compile depuis Replit, pas de build Windows)
 REM ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-echo [BUILD] Compilation du serveur API...
-pushd artifacts\api-server
-node build.mjs
-if errorlevel 1 (
-    echo [ERREUR] Build du serveur echoue.
-    popd
+if not exist "artifacts\api-server\dist\index.mjs" (
+    echo [ERREUR] artifacts\api-server\dist\index.mjs absent.
+    echo         Relancez : git pull
     goto fin
 )
-popd
-echo [OK] Serveur API compile
+echo [OK] Serveur API pret
 
 REM ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 REM 8. INITIALISATION BASE DE DONNEES
