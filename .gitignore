@@ -8,6 +8,11 @@ out-tsc
 .expo
 .expo-shared
 
+# Exception : le frontend pré-compilé est commité pour Windows
+# (Windows ne peut pas lancer Vite/Rollup, binaires natifs Linux)
+!artifacts/meteo-app/dist/
+!artifacts/meteo-app/dist/**
+
 # dependencies
 node_modules
 
