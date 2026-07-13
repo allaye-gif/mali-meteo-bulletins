@@ -1,138 +1,157 @@
 @echo off
+setlocal enabledelayedexpansion
 title MALI-METEO DEBUG
 chcp 65001 >nul 2>&1
 
-echo ============================================
-echo  MALI-METEO - MODE DEBUG
-echo  Cette fenetre NE SE FERMERA PAS
-echo ============================================
+set "ROOT=%~dp0"
+set "LOG=%ROOT%debug_log.txt"
+del "%LOG%" >nul 2>&1
+
+echo ============================================================
+echo  MALI-METEO DEBUG - resultat aussi dans debug_log.txt
+echo ============================================================
 echo.
 
-echo [ETAPE 1] Verification Node.js...
-node --version
-if errorlevel 1 (
-    echo ECHEC : Node.js introuvable
-    pause
-    exit /b 1
-)
-echo OK
+REM === 1. Node.js ===
+echo [1] Node.js :
+node --version 2>&1
+echo [1] Node.js : >> "%LOG%"
+node --version >> "%LOG%" 2>&1
 echo.
-pause
 
-echo [ETAPE 2] Verification pnpm...
-pnpm --version
-if errorlevel 1 (
-    echo ECHEC : pnpm introuvable, installation...
-    npm install -g pnpm
-)
+REM === 2. pnpm ===
+echo [2] pnpm :
+pnpm --version 2>&1
+echo [2] pnpm : >> "%LOG%"
+pnpm --version >> "%LOG%" 2>&1
 echo.
-pause
 
-echo [ETAPE 3] Recherche de psql...
+REM === 3. psql ===
+echo [3] Recherche psql :
 set "PSQL="
-where psql 2>nul && set "PSQL=psql"
+where psql >nul 2>&1
+if not errorlevel 1 set "PSQL=psql"
 if not defined PSQL (
     for %%v in (18 17 16 15 14) do (
         if not defined PSQL (
             if exist "C:\Program Files\PostgreSQL\%%v\bin\psql.exe" (
                 set "PSQL=C:\Program Files\PostgreSQL\%%v\bin\psql.exe"
-                echo Trouve : C:\Program Files\PostgreSQL\%%v\bin\psql.exe
             )
         )
     )
 )
-if not defined PSQL (
-    echo ECHEC : psql introuvable
-    pause
-    exit /b 1
+if defined PSQL (
+    echo    Trouve : %PSQL%
+    echo [3] psql : %PSQL% >> "%LOG%"
+) else (
+    echo    ECHEC : psql introuvable
+    echo [3] psql : INTROUVABLE >> "%LOG%"
 )
-echo PSQL=%PSQL%
 echo.
-pause
 
-echo [ETAPE 4] Test connexion PostgreSQL (mdp: allaye)...
+REM === 4. Connexion PostgreSQL ===
 set "PGPASSWORD=allaye"
-"%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()"
-if errorlevel 1 (
-    echo ECHEC : connexion PostgreSQL impossible
-    echo Tentative demarrage service...
-    net start postgresql-x64-18
-    net start postgresql-x64-17
-    net start postgresql-x64-16
-    net start postgresql-x64-15
-    net start postgresql-x64-14
-    timeout /t 5 /nobreak
-    "%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()"
-    if errorlevel 1 (
-        echo ECHEC definitif : PostgreSQL inaccessible
-        pause
-        exit /b 1
-    )
-)
+echo [4] Test connexion PostgreSQL :
+"%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()" 2>&1
+echo [4] code retour connexion : %ERRORLEVEL% >> "%LOG%"
+"%PSQL%" -U postgres -h localhost -p 5432 -c "SELECT version()" >> "%LOG%" 2>&1
 echo.
-pause
 
-echo [ETAPE 5] Creation base meteo_mali (si absente)...
-"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE=template0"
-echo Code retour: %ERRORLEVEL% (1=deja existante, c'est OK)
+REM === 5. Creation base ===
+echo [5] Creation base meteo_mali :
+"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE template0" 2>&1
+echo [5] code retour CREATE DB : %ERRORLEVEL% >> "%LOG%"
+"%PSQL%" -U postgres -h localhost -p 5432 -c "CREATE DATABASE meteo_mali ENCODING 'UTF8' TEMPLATE template0" >> "%LOG%" 2>&1
 echo.
-pause
 
-echo [ETAPE 6] Verification frontend...
-set "STATIC_PATH=%~dp0artifacts\meteo-app\dist\public"
-if exist "%STATIC_PATH%\index.html" (
-    echo OK : %STATIC_PATH%\index.html present
+REM === 6. Frontend ===
+echo [6] Frontend :
+if exist "%ROOT%artifacts\meteo-app\dist\public\index.html" (
+    echo    OK - index.html present
+    echo [6] frontend : OK >> "%LOG%"
 ) else (
-    echo ECHEC : %STATIC_PATH%\index.html absent
+    echo    ABSENT - %ROOT%artifacts\meteo-app\dist\public\index.html
+    echo [6] frontend : ABSENT >> "%LOG%"
 )
 echo.
-pause
 
-echo [ETAPE 7] Verification deploy\database_dump.sql...
-if exist "%~dp0deploy\database_dump.sql" (
-    echo OK : deploy\database_dump.sql present
+REM === 7. database_dump.sql ===
+echo [7] deploy\database_dump.sql :
+if exist "%ROOT%deploy\database_dump.sql" (
+    echo    OK - fichier present
+    echo [7] dump : OK >> "%LOG%"
 ) else (
-    echo ABSENT : deploy\database_dump.sql introuvable
+    echo    ABSENT
+    echo [7] dump : ABSENT >> "%LOG%"
 )
 echo.
-pause
 
-echo [ETAPE 8] Installation dependances pnpm...
-cd /d "%~dp0"
-if exist "node_modules\.pnpm\@rollup+rollup-linux*" (
-    echo Modules Linux detectes, suppression...
-    rmdir /s /q node_modules
+REM === 8. Modules Linux ===
+echo [8] Modules natifs Linux dans node_modules :
+set "LINUX_MOD=Aucun detecte (OK)"
+if exist "%ROOT%node_modules\.pnpm" (
+    for /d %%D in ("%ROOT%node_modules\.pnpm\@rollup+rollup-linux*") do set "LINUX_MOD=OUI %%D"
+    for /d %%D in ("%ROOT%node_modules\.pnpm\@esbuild+linux*") do set "LINUX_MOD=OUI %%D"
 )
-pnpm install --frozen-lockfile=false
-echo Code retour pnpm install: %ERRORLEVEL%
+echo    %LINUX_MOD%
+echo [8] modules linux : %LINUX_MOD% >> "%LOG%"
 echo.
-pause
 
-echo [ETAPE 9] Build serveur API...
-cd /d "%~dp0artifacts\api-server"
-node build.mjs
-echo Code retour build: %ERRORLEVEL%
-cd /d "%~dp0"
+REM === 9. pnpm install ===
+echo [9] pnpm install :
+cd /d "%ROOT%"
+pnpm install --frozen-lockfile=false 2>&1
+echo [9] code retour pnpm install : %ERRORLEVEL% >> "%LOG%"
 echo.
-pause
 
-echo [ETAPE 10] Import base de donnees...
-"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -c "DROP TABLE IF EXISTS bulletins, templates CASCADE"
-"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -f "%~dp0deploy\database_dump.sql"
-echo Code retour import: %ERRORLEVEL%
+REM === 10. Build API ===
+echo [10] Build serveur API :
+cd /d "%ROOT%artifacts\api-server"
+node build.mjs 2>&1
+echo [10] code retour build : %ERRORLEVEL% >> "%LOG%"
+cd /d "%ROOT%"
 echo.
-pause
 
-echo [ETAPE 11] Lancement serveur (PORT=1005)...
+REM === 11. dist/index.mjs ===
+echo [11] artifacts\api-server\dist\index.mjs :
+if exist "%ROOT%artifacts\api-server\dist\index.mjs" (
+    echo    OK - fichier present
+    echo [11] dist : OK >> "%LOG%"
+) else (
+    echo    ABSENT - build a echoue
+    echo [11] dist : ABSENT >> "%LOG%"
+)
+echo.
+
+REM === 12. Import DB ===
+echo [12] Import base de donnees :
+"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -c "DROP TABLE IF EXISTS bulletins, templates CASCADE" 2>&1
+"%PSQL%" -U postgres -h localhost -p 5432 -d meteo_mali -f "%ROOT%deploy\database_dump.sql" 2>&1
+echo [12] code retour import : %ERRORLEVEL% >> "%LOG%"
+echo.
+
+REM === 13. Lancement node ===
+echo [13] Lancement serveur (PORT=1005) :
+echo      Ctrl+C pour arreter
+echo.
 set "PORT=1005"
 set "NODE_ENV=production"
 set "BASE_PATH=/"
-set "STATIC_PATH=%~dp0artifacts\meteo-app\dist\public"
+set "STATIC_PATH=%ROOT%artifacts\meteo-app\dist\public"
 set "DATABASE_URL=postgresql://postgres:allaye@localhost:5432/meteo_mali?sslmode=disable"
 set "SESSION_SECRET=meteo-mali-anam-secret"
 set "LOG_LEVEL=info"
-node "%~dp0artifacts\api-server\dist\index.mjs"
+
+node "%ROOT%artifacts\api-server\dist\index.mjs" 2>&1
+echo.
+echo [NODE ARRETE - code: %ERRORLEVEL%]
+echo [NODE ARRETE - code: %ERRORLEVEL%] >> "%LOG%"
 
 echo.
-echo Serveur arrete (code: %ERRORLEVEL%)
-pause
+echo ============================================================
+echo  Rapport complet enregistre dans : %LOG%
+echo  Copiez le contenu de ce fichier pour le diagnostic.
+echo ============================================================
+echo.
+
+cmd /k echo Tape EXIT pour fermer.
